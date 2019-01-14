@@ -3,6 +3,7 @@ package fi.hsl.transitlog.hfp;
 import org.junit.Test;
 
 import java.net.URL;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.Scanner;
@@ -42,6 +43,20 @@ public class MessageParserTest {
     @Test
     public void parseTopic() throws Exception {
         HfpMetadata meta = parseAndValidateTopic("/hfp/v1/journey/ongoing/bus/0022/00854/4555B/2/Leppävaara/19:56/4150264/5/60;24/28/65/06");
+        assertEquals(HfpMetadata.JourneyType.journey, meta.journey_type);
+        assertEquals(true, meta.is_ongoing);
+        assertEquals(HfpMetadata.TransportMode.bus, meta.mode.get());
+        assertEquals(22, meta.owner_operator_id);
+        assertEquals(854, meta.vehicle_number);
+        assertEquals(MessageParser.createUniqueVehicleId(22, 854), meta.unique_vehicle_id);
+
+        assertEquals("4555B", meta.route_id.get());
+        assertEquals(2, (int)meta.direction_id.get());
+        assertEquals("Leppävaara", meta.headsign.get());
+        assertEquals(LocalTime.of(19, 56), meta.journey_start_time.get());
+        assertEquals("4150264", meta.next_stop_id.get());
+        assertEquals(5, (int)meta.geohash_level.get());
+
     }
 
     private HfpMetadata parseAndValidateTopic(String topic) throws Exception {

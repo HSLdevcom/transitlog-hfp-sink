@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -80,12 +81,23 @@ public class MessageParser {
         meta.topic_version = parts[index++];
         // "/hfp/v1/journey/ongoing/bus/0022/00854/4555B/2/Leppävaara/19:56/4150264/5/60;24/28/65/06");
         meta.journey_type = HfpMetadata.JourneyType.valueOf(parts[index++]);
-        meta.is_ongoing = parts[index++] == "ongoing";
+        meta.is_ongoing = "ongoing".equals(parts[index++]);// == "ongoing";
         meta.mode = HfpMetadata.TransportMode.fromString(parts[index++]);
         meta.owner_operator_id = Integer.parseInt(parts[index++]);
         meta.vehicle_number = Integer.parseInt(parts[index++]);
+        meta.unique_vehicle_id = createUniqueVehicleId(meta.owner_operator_id, meta.vehicle_number);
+        if (index + 6 < parts.length) {
+            meta.route_id = Optional.ofNullable(parts[index++]);
+            meta.direction_id = Optional.ofNullable(Integer.parseInt(parts[index++]));
+            meta.headsign = Optional.ofNullable(parts[index++]);
+            meta.journey_start_time = Optional.ofNullable(LocalTime.parse(parts[index++]));
+            meta.next_stop_id = Optional.ofNullable(parts[index++]);
+            meta.geohash_level = Optional.ofNullable(Integer.parseInt(parts[index++]));
 
-
+        }
+        else {
+            log.warn("could not parse first batch of additional fields for topic {}", topic);
+        }
     /*
     public JourneyType journey_type;
     public boolean is_ongoing;
@@ -105,6 +117,10 @@ public class MessageParser {
 
 
         return Optional.of(meta);
+    }
+
+    static String createUniqueVehicleId(int ownerOperatorId, int vehicleNumber) {
+        return ownerOperatorId + "/" + vehicleNumber;
     }
 
     static String joinFirstNParts(String[] parts, int upToIndexExcludingThis, String delimiter) {
