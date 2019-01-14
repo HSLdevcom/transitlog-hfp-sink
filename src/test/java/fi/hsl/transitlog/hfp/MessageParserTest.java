@@ -57,6 +57,16 @@ public class MessageParserTest {
         assertEquals("4150264", meta.next_stop_id.get());
         assertEquals(5, (int)meta.geohash_level.get());
 
+        assertTrue(60.260 - meta.topic_latitude.get() < 0.00001);
+        assertTrue(24.856 - meta.topic_longitude.get() < 0.00001);
+    }
+
+    @Test
+    public void parseZeroLevelGeohash() throws Exception {
+        HfpMetadata meta = parseAndValidateTopic("/hfp/v1/journey/ongoing/bus/0022/00854/4555B/2/Leppävaara/19:56/4150264/0////");
+        assertEquals(0, (int)meta.geohash_level.get());
+        assertFalse(meta.topic_latitude.isPresent());
+        assertFalse(meta.topic_longitude.isPresent());
     }
 
     private HfpMetadata parseAndValidateTopic(String topic) throws Exception {

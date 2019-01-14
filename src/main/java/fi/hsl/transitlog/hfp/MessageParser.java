@@ -64,7 +64,7 @@ public class MessageParser {
     public static Optional<HfpMetadata> parseMetadata(String topic, OffsetDateTime receivedAt) throws Exception {
         log.debug("Parsing metadata from topic: " + topic);
 
-        final String[] parts = topic.split("/");
+        final String[] parts = topic.split("/", -1);//-1 to include empty substrings
 
         final HfpMetadata meta = new HfpMetadata();
         meta.received_at = receivedAt;
@@ -79,45 +79,76 @@ public class MessageParser {
         meta.topic_prefix = joinFirstNParts(parts, versionIndex, "/");
         int index = versionIndex;
         meta.topic_version = parts[index++];
-        // "/hfp/v1/journey/ongoing/bus/0022/00854/4555B/2/Leppävaara/19:56/4150264/5/60;24/28/65/06");
+
         meta.journey_type = HfpMetadata.JourneyType.valueOf(parts[index++]);
         meta.is_ongoing = "ongoing".equals(parts[index++]);// == "ongoing";
         meta.mode = HfpMetadata.TransportMode.fromString(parts[index++]);
         meta.owner_operator_id = Integer.parseInt(parts[index++]);
         meta.vehicle_number = Integer.parseInt(parts[index++]);
         meta.unique_vehicle_id = createUniqueVehicleId(meta.owner_operator_id, meta.vehicle_number);
-        if (index + 6 < parts.length) {
+        if (index + 6 <= parts.length) {
             meta.route_id = Optional.ofNullable(parts[index++]);
             meta.direction_id = Optional.ofNullable(Integer.parseInt(parts[index++]));
             meta.headsign = Optional.ofNullable(parts[index++]);
             meta.journey_start_time = Optional.ofNullable(LocalTime.parse(parts[index++]));
             meta.next_stop_id = Optional.ofNullable(parts[index++]);
             meta.geohash_level = Optional.ofNullable(Integer.parseInt(parts[index++]));
-
         }
         else {
             log.warn("could not parse first batch of additional fields for topic {}", topic);
         }
-    /*
-    public JourneyType journey_type;
-    public boolean is_ongoing;
-    public TransportMode mode;
-    public int owner_operator_id;
-    public int vehicle_number;
-    public String unique_vehicle_id;
-    public Optional<String> route_id;
-    public Optional<Integer> direction_id;
-    public Optional<String> headsign;
-    public Optional<LocalTime> journey_start_time;
-    public Optional<String> next_stop_id;
-    public Optional<Integer> geohash_level;
-    public Optional<Double> topic_latitude;
-    public Optional<Double> topic_longitude;
-     */
-
-
+        //GeoHash is overloaded, if it's zero it means there's been some changes in the schedule,etc.
+        // Also if level is zero, then no other coordinates.
+        boolean isGeoHashOver0 = meta.geohash_level.map(level -> level > 0).orElse(false);
+        if (index + 4 <= parts.length && isGeoHashOver0) {
+            Optional<GeoHash> maybeGeoHash = parseGeoHash(parts, index);
+            meta.topic_latitude = maybeGeoHash.map(hash -> hash.latitude);
+            meta.topic_longitude = maybeGeoHash.map(hash -> hash.longitude);
+        }
+        else {
+            log.debug("could not parse second batch of additional fields (geohash) for topic {}", topic);
+        }
         return Optional.of(meta);
     }
+
+    public static class GeoHash {
+        public double latitude;
+        public double longitude;
+    }
+
+    static Optional<GeoHash> parseGeoHash(String[] parts, int startIndex) {
+        Optional<GeoHash> maybeGeoHash = Optional.empty();
+
+        int index = startIndex;
+        String[] latLong0 = parts[index++].split(";");
+        if (latLong0.length == 2) {
+            StringBuffer latitude = new StringBuffer(latLong0[0]).append(".");
+            StringBuffer longitude = new StringBuffer(latLong0[1]).append(".");
+
+            String latLong1 = parts[index++];
+            latitude.append(latLong1.substring(0, 1));
+            longitude.append(latLong1.substring(1, 2));
+
+            String latLong2 = parts[index++];
+            latitude.append(latLong2.substring(0, 1));
+            longitude.append(latLong2.substring(1, 2));
+
+            String latLong3 = parts[index++];
+            latitude.append(latLong3.substring(0, 1));
+            longitude.append(latLong3.substring(1, 2));
+
+            GeoHash geoHash = new GeoHash();
+            geoHash.latitude = Double.parseDouble(latitude.toString());
+            geoHash.longitude = Double.parseDouble(longitude.toString());
+            maybeGeoHash = Optional.of(geoHash);
+        }
+        else {
+            log.debug("Could not parse latitude & longitude from {}", latLong0);
+        }
+
+        return maybeGeoHash;
+    }
+
 
     static String createUniqueVehicleId(int ownerOperatorId, int vehicleNumber) {
         return ownerOperatorId + "/" + vehicleNumber;

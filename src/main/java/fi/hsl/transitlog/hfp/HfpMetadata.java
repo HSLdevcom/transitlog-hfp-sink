@@ -38,17 +38,17 @@ public class HfpMetadata {
     public String topic_version;
     public JourneyType journey_type;
     public boolean is_ongoing;
-    public Optional<TransportMode> mode;
+    public Optional<TransportMode> mode = Optional.empty();
     public int owner_operator_id;
     public int vehicle_number;
     public String unique_vehicle_id;
-    public Optional<String> route_id;
-    public Optional<Integer> direction_id;
-    public Optional<String> headsign;
-    public Optional<LocalTime> journey_start_time;
-    public Optional<String> next_stop_id;
-    public Optional<Integer> geohash_level;
-    public Optional<Double> topic_latitude;
-    public Optional<Double> topic_longitude;
+    public Optional<String> route_id  = Optional.empty();
+    public Optional<Integer> direction_id = Optional.empty();
+    public Optional<String> headsign = Optional.empty();
+    public Optional<LocalTime> journey_start_time = Optional.empty();
+    public Optional<String> next_stop_id = Optional.empty();
+    public Optional<Integer> geohash_level = Optional.empty();
+    public Optional<Double> topic_latitude = Optional.empty();
+    public Optional<Double> topic_longitude = Optional.empty();
 
 }
