@@ -62,24 +62,25 @@ public class MessageParser {
 
     public static Optional<HfpMetadata> parseMetadata(String topic, OffsetDateTime receivedAt) throws Exception {
         log.debug("Parsing metadata from topic: " + topic);
+
         final String[] parts = topic.split("/");
 
         final HfpMetadata meta = new HfpMetadata();
         meta.received_at = receivedAt;
-
-        String versionIndex = parseVersion(parts);
-        if (versionIndex == null) {
+        //We first find the index of version. The prefix topic part can consist of more complicated path
+        int versionIndex = findVersionIndex(parts);
+        if (versionIndex < 0) {
             log.error("Failed to find topic version from topic " + topic);
             return Optional.empty();
         }
-        meta.topic_version = versionIndex;
 
+
+        meta.topic_prefix = joinFirstNParts(parts, versionIndex, "/");
+        meta.topic_version = parts[versionIndex];
+        // "/hfp/v1/journey/ongoing/bus/0022/00854/4555B/2/Leppävaara/19:56/4150264/5/60;24/28/65/06");
 
 
     /*
-    public OffsetDateTime received_at;
-    public Optional<String> topic_prefix;
-    public String topic_version;
     public JourneyType journey_type;
     public boolean is_ongoing;
     public TransportMode mode;
@@ -100,12 +101,26 @@ public class MessageParser {
         return Optional.of(meta);
     }
 
-    public static String parseVersion(String[] parts) {
-        for (String p: parts) {
+    static String joinFirstNParts(String[] parts, int upToIndexExcludingThis, String delimiter) {
+        StringBuffer buffer = new StringBuffer();
+        int index = 0;
+
+        buffer.append(delimiter);
+        while (index < upToIndexExcludingThis - 1) {
+            index++;
+            buffer.append(parts[index]);
+            buffer.append(delimiter);
+        }
+        return buffer.toString();
+    }
+
+    public static int findVersionIndex(String[] parts) {
+        for (int n = 0; n < parts.length; n++) {
+            String p = parts[n];
             if (topicVersionRegex.matcher(p).matches()) {
-                return p;
+                return n;
             }
         }
-        return null;
+        return -1;
     }
 }

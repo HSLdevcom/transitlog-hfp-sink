@@ -53,4 +53,21 @@ public class MessageParserTest {
         assertEquals("v1", meta.topic_version);
         return meta;
     }
+
+    @Test
+    public void testTopicPrefixParsing() throws Exception {
+        String prefix = parseTopicPrefix("/hfp/v1/journey/ongoing/bus/0022/00854/4555B/2/Leppävaara/19:56/4150264/5/60;24/28/65/06");
+        assertEquals("/hfp/", prefix);
+        String emptyPrefix = parseTopicPrefix("/v1/journey/ongoing/bus/0022/00854/4555B/2/Leppävaara/19:56/4150264/5/60;24/28/65/06");
+        assertEquals("/", emptyPrefix);
+        String longerPrefix = parseTopicPrefix("/hsldevcomm/public/hfp/v1/journey/ongoing/bus/0022/00854/4555B/2/Leppävaara/19:56/4150264/5/60;24/28/65/06");
+        assertEquals("/hsldevcomm/public/hfp/", longerPrefix);
+
+    }
+
+    private String parseTopicPrefix(String topic) throws Exception {
+        final String[] allParts = topic.split("/");
+        int versionIndex = MessageParser.findVersionIndex(allParts);
+        return MessageParser.joinFirstNParts(allParts, versionIndex, "/");
+    }
 }

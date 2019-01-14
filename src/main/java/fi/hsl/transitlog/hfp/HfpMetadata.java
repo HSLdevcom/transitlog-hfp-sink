@@ -14,7 +14,7 @@ public class HfpMetadata {
     }
 
     public OffsetDateTime received_at;
-    public Optional<String> topic_prefix;
+    public String topic_prefix;
     public String topic_version;
     public JourneyType journey_type;
     public boolean is_ongoing;
