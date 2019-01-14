@@ -3,6 +3,8 @@ package fi.hsl.transitlog.hfp;
 import org.junit.Test;
 
 import java.net.URL;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -11,6 +13,34 @@ import java.util.Scanner;
 import static org.junit.Assert.*;
 
 public class MessageParserTest {
+
+    @Test
+    public void parseTimestampSafely() {
+        Timestamp ts = MessageParser.safeParseTimestamp("2018-04-05T17:38:36Z");
+        assertEquals(1522949916000L, ts.getTime());
+
+        Timestamp missingTimezone = MessageParser.safeParseTimestamp("2018-04-05T17:38:36");
+        assertNull(missingTimezone);
+
+        assertNull(MessageParser.safeParseTimestamp("datetime"));
+        assertNull(MessageParser.safeParseTimestamp(null));
+    }
+
+    @Test
+    public void parseTimeSafely() {
+        Time time = MessageParser.safeParseTime("18:00");
+        assertTrue(time.toLocalTime().equals(LocalTime.of(18, 0)));
+
+        Time earlyTime = MessageParser.safeParseTime("8:00");
+        assertTrue(earlyTime.toLocalTime().equals(LocalTime.of(8, 0)));
+
+        Time earlyTime2 = MessageParser.safeParseTime("08:00");
+        assertTrue(earlyTime2.toLocalTime().equals(LocalTime.of(8, 0)));
+
+        assertNull(MessageParser.safeParseTime("random-time"));
+        assertNull(MessageParser.safeParseTime(null));
+    }
+
     @Test
     public void parseSampleFile() throws Exception {
         ClassLoader classLoader = getClass().getClassLoader();
@@ -67,6 +97,51 @@ public class MessageParserTest {
         assertEquals(0, (int)meta.geohash_level.get());
         assertFalse(meta.topic_latitude.isPresent());
         assertFalse(meta.topic_longitude.isPresent());
+    }
+
+    @Test
+    public void parseTopicWhenItemsMissing() throws Exception {
+        HfpMetadata meta = parseAndValidateTopic("/hfp/v1/journey/ongoing//0022/00854////19:56///60;24/28/65/06");
+        assertEquals(HfpMetadata.JourneyType.journey, meta.journey_type);
+        assertEquals(true, meta.is_ongoing);
+        assertFalse(meta.mode.isPresent());
+
+        assertEquals(22, meta.owner_operator_id);
+        assertEquals(854, meta.vehicle_number);
+        assertEquals(MessageParser.createUniqueVehicleId(22, 854), meta.unique_vehicle_id);
+
+        assertFalse(meta.route_id.isPresent());
+        assertFalse(meta.direction_id.isPresent());
+        assertFalse(meta.headsign.isPresent());
+        assertEquals(LocalTime.of(19, 56), meta.journey_start_time.get());
+        assertFalse(meta.next_stop_id.isPresent());
+        assertFalse(meta.geohash_level.isPresent());
+
+        assertFalse(meta.topic_latitude.isPresent());
+        assertFalse(meta.topic_longitude.isPresent());
+    }
+
+    @Test
+    public void parseTopicWhenPrefixLonger() throws Exception {
+        HfpMetadata meta = parseAndValidateTopic("/hsldevcom/public/hfp/v1/deadrun/ongoing/tram/0022/00854////08:08///60;24/28/65/06");
+        assertEquals(HfpMetadata.JourneyType.deadrun, meta.journey_type);
+        assertEquals(true, meta.is_ongoing);
+        assertEquals(HfpMetadata.TransportMode.tram, meta.mode.get());
+
+        assertEquals(22, meta.owner_operator_id);
+        assertEquals(854, meta.vehicle_number);
+        assertEquals(MessageParser.createUniqueVehicleId(22, 854), meta.unique_vehicle_id);
+
+        assertFalse(meta.route_id.isPresent());
+        assertFalse(meta.direction_id.isPresent());
+        assertFalse(meta.headsign.isPresent());
+        assertEquals(LocalTime.of(8, 8), meta.journey_start_time.get());
+        assertFalse(meta.next_stop_id.isPresent());
+        assertFalse(meta.geohash_level.isPresent());
+
+        assertFalse(meta.topic_latitude.isPresent());
+        assertFalse(meta.topic_longitude.isPresent());
+
     }
 
     private HfpMetadata parseAndValidateTopic(String topic) throws Exception {

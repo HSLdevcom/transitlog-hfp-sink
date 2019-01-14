@@ -77,11 +77,11 @@ public class QueueWriter {
 
                 //From payload:
                 setNullable(index++, message.VP.desi, Types.VARCHAR, statement);
-                setNullable(index++, safeParseInt(message.VP.dir), Types.INTEGER, statement);
+                setNullable(index++, MessageParser.safeParseInt(message.VP.dir), Types.INTEGER, statement);
                 setNullable(index++, message.VP.oper, Types.INTEGER, statement);
 
                 statement.setInt(index++, message.VP.veh);
-                statement.setTimestamp(index++, safeParseTimestamp(message.VP.tst));
+                statement.setTimestamp(index++, MessageParser.safeParseTimestamp(message.VP.tst));
                 statement.setLong(index++, message.VP.tsi);
 
                 setNullable(index++, message.VP.spd, Types.DOUBLE, statement);
@@ -91,11 +91,11 @@ public class QueueWriter {
                 setNullable(index++, message.VP.acc, Types.DOUBLE, statement);
                 setNullable(index++, message.VP.dl, Types.INTEGER, statement);
                 setNullable(index++, message.VP.odo, Types.DOUBLE, statement);
-                setNullable(index++, safeParseBoolean(message.VP.drst), Types.BOOLEAN, statement);
+                setNullable(index++, MessageParser.safeParseBoolean(message.VP.drst), Types.BOOLEAN, statement);
                 setNullable(index++, message.VP.oday, Types.DATE, statement);
                 setNullable(index++, message.VP.jrn, Types.INTEGER, statement);
                 setNullable(index++, message.VP.line, Types.INTEGER, statement);
-                setNullable(index++, safeParseTime(message.VP.start), Types.TIME, statement);
+                setNullable(index++, MessageParser.safeParseTime(message.VP.start), Types.TIME, statement);
 
                 statement.addBatch();
             }
@@ -142,53 +142,4 @@ public class QueueWriter {
         }
     }
 
-    static Integer safeParseInt(String n) {
-        if (n == null || n.isEmpty())
-            return null;
-        else {
-            try {
-                return Integer.parseInt(n);
-            }
-            catch (NumberFormatException e) {
-                log.error("Failed to convert {} to integer", n);
-                return null;
-            }
-        }
-    }
-
-    static Boolean safeParseBoolean(Integer n) {
-        if (n == null)
-            return null;
-        else
-            return n != 0;
-    }
-
-    static Time safeParseTime(String time) {
-        if (time == null)
-            return null;
-        else {
-            try {
-                return Time.valueOf(time + ":00"); // parser requires seconds also.
-            }
-            catch (Exception e) {
-                log.error("Failed to convert {} to java.sql.Time", time);
-                return null;
-            }
-        }
-    }
-
-    static Timestamp safeParseTimestamp(String dt) {
-        if (dt == null)
-            return null;
-        else {
-            try {
-                OffsetDateTime offsetDt = OffsetDateTime.parse(dt);
-                return new Timestamp(offsetDt.toEpochSecond() * 1000L);
-            }
-            catch (Exception e) {
-                log.error("Failed to convert {} to java.sql.Timestamp", dt);
-                return null;
-            }
-        }
-    }
 }

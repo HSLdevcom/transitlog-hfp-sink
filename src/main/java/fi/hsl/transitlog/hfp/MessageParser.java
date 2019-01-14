@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -87,12 +89,12 @@ public class MessageParser {
         meta.vehicle_number = Integer.parseInt(parts[index++]);
         meta.unique_vehicle_id = createUniqueVehicleId(meta.owner_operator_id, meta.vehicle_number);
         if (index + 6 <= parts.length) {
-            meta.route_id = Optional.ofNullable(parts[index++]);
-            meta.direction_id = Optional.ofNullable(Integer.parseInt(parts[index++]));
-            meta.headsign = Optional.ofNullable(parts[index++]);
+            meta.route_id = Optional.ofNullable(validateString(parts[index++]));
+            meta.direction_id = Optional.ofNullable(safeParseInt(parts[index++]));
+            meta.headsign = Optional.ofNullable(validateString(parts[index++]));
             meta.journey_start_time = Optional.ofNullable(LocalTime.parse(parts[index++]));
-            meta.next_stop_id = Optional.ofNullable(parts[index++]);
-            meta.geohash_level = Optional.ofNullable(Integer.parseInt(parts[index++]));
+            meta.next_stop_id = Optional.ofNullable(validateString(parts[index++]));
+            meta.geohash_level = Optional.ofNullable(safeParseInt(parts[index++]));
         }
         else {
             log.warn("could not parse first batch of additional fields for topic {}", topic);
@@ -175,5 +177,62 @@ public class MessageParser {
             }
         }
         return -1;
+    }
+
+    static String validateString(String str) {
+        if (str == null || str.isEmpty())
+            return null;
+        else
+            return str;
+    }
+
+    static Integer safeParseInt(String n) {
+        if (n == null || n.isEmpty())
+            return null;
+        else {
+            try {
+                return Integer.parseInt(n);
+            }
+            catch (NumberFormatException e) {
+                log.error("Failed to convert {} to integer", n);
+                return null;
+            }
+        }
+    }
+
+    static Boolean safeParseBoolean(Integer n) {
+        if (n == null)
+            return null;
+        else
+            return n != 0;
+    }
+
+    static Time safeParseTime(String time) {
+        if (time == null)
+            return null;
+        else {
+            try {
+                return Time.valueOf(time + ":00"); // parser requires seconds also.
+            }
+            catch (Exception e) {
+                log.error("Failed to convert {} to java.sql.Time", time);
+                return null;
+            }
+        }
+    }
+
+    static Timestamp safeParseTimestamp(String dt) {
+        if (dt == null)
+            return null;
+        else {
+            try {
+                OffsetDateTime offsetDt = OffsetDateTime.parse(dt);
+                return new Timestamp(offsetDt.toEpochSecond() * 1000L);
+            }
+            catch (Exception e) {
+                log.error("Failed to convert {} to java.sql.Timestamp", dt);
+                return null;
+            }
+        }
     }
 }
