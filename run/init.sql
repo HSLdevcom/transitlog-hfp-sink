@@ -86,6 +86,7 @@ CREATE INDEX unique_vehicle_id_idx ON vehicles (unique_vehicle_id);
 CREATE INDEX oday_idx ON vehicles USING brin (oday);
 CREATE INDEX lat_idx ON vehicles (lat);
 CREATE INDEX long_idx ON vehicles (long);
+CREATE INDEX next_stop_id_idx ON vehicles (next_stop_id);
 
 -- Set up Hasura.
 
