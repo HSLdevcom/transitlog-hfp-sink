@@ -1,16 +1,36 @@
 package fi.hsl.transitlog.hfp;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
 public class HfpMetadata {
+    private static final Logger log = LoggerFactory.getLogger(HfpMetadata.class);
+
     public enum JourneyType {
         journey, deadrun
     }
 
     public enum TransportMode {
-        bus, train, tram, metro, ferry
+        bus, train, tram, metro, ferry;
+
+        public static Optional<TransportMode> fromString(String str) {
+            // There is a Fara VPC bug where the mode is sometimes missing.
+            if (str == null || str.isEmpty()) {
+                log.warn("Could not parse TransportMode because it's empty");
+                return Optional.empty();
+            }
+            try {
+                return Optional.of(TransportMode.valueOf(str));
+            }
+            catch (Exception e) {
+                log.warn("Could not parse TransportMode: " + str);
+                return Optional.empty();
+            }
+        }
     }
 
     public OffsetDateTime received_at;
@@ -18,7 +38,7 @@ public class HfpMetadata {
     public String topic_version;
     public JourneyType journey_type;
     public boolean is_ongoing;
-    public TransportMode mode;
+    public Optional<TransportMode> mode;
     public int owner_operator_id;
     public int vehicle_number;
     public String unique_vehicle_id;

@@ -39,7 +39,8 @@ CREATE TABLE vehicles (
     topic_version      TEXT             NOT NULL,
     journey_type       JOURNEY_TYPE     NOT NULL,
     is_ongoing         BOOLEAN          NOT NULL,
-    mode               TRANSPORT_MODE   NOT NULL,
+    -- There is a bug in Fara HFP where sometimes when two cars get the same unique_vehicle_id, at least one of them loses its mode.
+    mode               TRANSPORT_MODE       NULL,
     owner_operator_id  SMALLINT         NOT NULL,
     vehicle_number     INTEGER          NOT NULL,
     unique_vehicle_id  TEXT             NOT NULL,

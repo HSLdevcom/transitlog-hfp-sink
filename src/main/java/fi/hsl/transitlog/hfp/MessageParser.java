@@ -76,8 +76,14 @@ public class MessageParser {
 
 
         meta.topic_prefix = joinFirstNParts(parts, versionIndex, "/");
-        meta.topic_version = parts[versionIndex];
+        int index = versionIndex;
+        meta.topic_version = parts[index++];
         // "/hfp/v1/journey/ongoing/bus/0022/00854/4555B/2/Leppävaara/19:56/4150264/5/60;24/28/65/06");
+        meta.journey_type = HfpMetadata.JourneyType.valueOf(parts[index++]);
+        meta.is_ongoing = parts[index++] == "ongoing";
+        meta.mode = HfpMetadata.TransportMode.fromString(parts[index++]);
+        meta.owner_operator_id = Integer.parseInt(parts[index++]);
+        meta.vehicle_number = Integer.parseInt(parts[index++]);
 
 
     /*
