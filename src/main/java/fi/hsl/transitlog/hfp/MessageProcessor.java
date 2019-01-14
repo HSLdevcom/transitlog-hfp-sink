@@ -17,7 +17,7 @@ public class MessageProcessor implements IMqttMessageHandler {
     private static final Logger log = LoggerFactory.getLogger(MessageProcessor.class);
 
     //TODO consider different type such as LinkedList for performance. insertion is cheap in that, how about doing the insert?
-    final ArrayList<HfpMessage> queue;
+    final ArrayList<HfpData> queue;
     final int QUEUE_MAX_SIZE = 100000;
     final MessageParser parser = MessageParser.newInstance();
     final QueueWriter writer;
@@ -54,7 +54,7 @@ public class MessageProcessor implements IMqttMessageHandler {
         }
 
         if (maybeHfp.isPresent() && maybeMetadata.isPresent()) {
-            queue.add(maybeHfp.get()); //TODO add metadata
+            queue.add(new HfpData(maybeMetadata.get(), maybeHfp.get()));
         }
 
         if (queue.size() % 1000 == 0) {

@@ -122,7 +122,8 @@ public class MessageParser {
         Optional<GeoHash> maybeGeoHash = Optional.empty();
 
         int index = startIndex;
-        String[] latLong0 = parts[index++].split(";");
+        final String firstLatLong = parts[index++];
+        String[] latLong0 = firstLatLong.split(";");
         if (latLong0.length == 2) {
             StringBuffer latitude = new StringBuffer(latLong0[0]).append(".");
             StringBuffer longitude = new StringBuffer(latLong0[1]).append(".");
@@ -145,7 +146,7 @@ public class MessageParser {
             maybeGeoHash = Optional.of(geoHash);
         }
         else {
-            log.debug("Could not parse latitude & longitude from {}", latLong0);
+            log.debug("Could not parse latitude & longitude from {}", firstLatLong);
         }
 
         return maybeGeoHash;

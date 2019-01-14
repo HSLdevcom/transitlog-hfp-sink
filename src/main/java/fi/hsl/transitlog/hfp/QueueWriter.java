@@ -53,17 +53,17 @@ public class QueueWriter {
                 .toString();
     }
 
-    public void write(List<HfpMessage> messages) throws Exception {
+    public void write(List<HfpData> messages) throws Exception {
         //TODO max batch size
         log.info("Writing {} rows to database", messages.size());
-        //TODO test using copy: https://www.postgresql.org/docs/current/sql-copy.html
-        //https://jdbc.postgresql.org/documentation/publicapi/org/postgresql/copy/CopyManager.html
-
+        
         long startTime = System.currentTimeMillis();
         String queryString = createInsertStatement();
         try (PreparedStatement statement = connection.prepareStatement(queryString)) {
 
-            for (HfpMessage message: messages) {
+            for (HfpData data: messages) {
+                HfpMessage message = data.getPayload();
+
                 int index = 1;
                 statement.setTimestamp(index++, java.sql.Timestamp.valueOf(LocalDateTime.now(ZoneId.of("UTC"))));
                 statement.setString(index++,"topic_prefix");
