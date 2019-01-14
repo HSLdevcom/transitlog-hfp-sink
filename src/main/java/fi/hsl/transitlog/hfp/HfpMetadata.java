@@ -31,7 +31,4 @@ public class HfpMetadata {
     public Optional<Double> topic_latitude;
     public Optional<Double> topic_longitude;
 
-    public static HfpMetadata fromTopic(String topic) {
-        return new HfpMetadata();
-    }
 }

@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.Optional;
 
 public class MessageProcessor implements IMqttMessageHandler {
 
@@ -41,10 +42,21 @@ public class MessageProcessor implements IMqttMessageHandler {
             return;
         }
 
-        //HfpMessage hfp = parser.parse(message);
-        HfpMessage hfp = parser.safeParse(message);
-        queue.add(hfp);
-        //queue.add(message);
+        Optional<HfpMetadata> maybeMetadata = MessageParser.safeParseMetadata(topic);
+        if (!maybeMetadata.isPresent()) {
+            log.warn("Failed to parse hfp metadata from MQTT topic");
+        }
+
+
+        Optional<HfpMessage> maybeHfp = parser.safeParse(message);
+        if (!maybeHfp.isPresent()) {
+            log.warn("Failed to parse hfp payload from MQTT message");
+        }
+
+        if (maybeHfp.isPresent() && maybeMetadata.isPresent()) {
+            queue.add(maybeHfp.get()); //TODO add metadata
+        }
+
         if (queue.size() % 1000 == 0) {
             log.debug("Got messages: " + queue.size());
             writer.write(queue);

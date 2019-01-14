@@ -7,9 +7,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.OffsetDateTime;
+import java.util.Optional;
+import java.util.regex.Pattern;
 
 public class MessageParser {
     private static final Logger log = LoggerFactory.getLogger(MessageParser.class);
+
+    static final Pattern topicVersionRegex = Pattern.compile("(^v\\d+|dev)");
 
     // Let's use dsl-json (https://github.com/ngs-doo/dsl-json) for performance.
     // Based on this benchmark: https://github.com/fabienrenaud/java-json-benchmark
@@ -31,14 +36,74 @@ public class MessageParser {
         return dslJson.deserialize(HfpMessage.class, data, data.length);
     }
 
-    public HfpMessage safeParse(MqttMessage message) {
+    public Optional<HfpMessage> safeParse(MqttMessage message) {
         try {
-            return parse(message);
+            return Optional.ofNullable(parse(message));
         }
         catch (Exception e) {
             log.error("Failed to parse message {}", new String(message.getPayload()));
-            return null;
+            return Optional.empty();
         }
     }
 
+    /*
+    public OffsetDateTime received_at;
+    public Optional<String> topic_prefix;
+    public String topic_version;
+    public JourneyType journey_type;
+    public boolean is_ongoing;
+    public TransportMode mode;
+    public int owner_operator_id;
+    public int vehicle_number;
+    public String unique_vehicle_id;
+    public Optional<String> route_id;
+    public Optional<Integer> direction_id;
+    public Optional<String> headsign;
+    public Optional<LocalTime> journey_start_time;
+    public Optional<String> next_stop_id;
+    public Optional<Integer> geohash_level;
+    public Optional<Double> topic_latitude;
+    public Optional<Double> topic_longitude;
+     */
+
+
+
+    public static Optional<HfpMetadata> safeParseMetadata(String topic) throws Exception {
+        try {
+            return parseMetadata(topic);
+        }
+        catch (Exception e) {
+            log.error("Failed to parse message metadata from topic " + topic, e);
+            return Optional.empty();
+        }
+    }
+
+    public static Optional<HfpMetadata> parseMetadata(String topic) throws Exception {
+        return parseMetadata(topic, OffsetDateTime.now());
+    }
+
+    public static Optional<HfpMetadata> parseMetadata(String topic, OffsetDateTime receivedAt) throws Exception {
+        log.debug("Parsing metadata from topic: " + topic);
+        final String[] parts = topic.split("/");
+
+        final HfpMetadata meta = new HfpMetadata();
+        meta.received_at = receivedAt;
+
+        String versionIndex = parseVersion(parts);
+        if (versionIndex == null) {
+            log.error("Failed to find topic version from topic " + topic);
+            return Optional.empty();
+        }
+
+        return Optional.of(meta);
+    }
+
+    public static String parseVersion(String[] parts) {
+        for (String p: parts) {
+            if (topicVersionRegex.matcher(p).matches()) {
+                return p;
+            }
+        }
+        return null;
+    }
 }
