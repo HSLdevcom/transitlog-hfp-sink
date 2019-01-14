@@ -46,28 +46,6 @@ public class MessageParser {
         }
     }
 
-    /*
-    public OffsetDateTime received_at;
-    public Optional<String> topic_prefix;
-    public String topic_version;
-    public JourneyType journey_type;
-    public boolean is_ongoing;
-    public TransportMode mode;
-    public int owner_operator_id;
-    public int vehicle_number;
-    public String unique_vehicle_id;
-    public Optional<String> route_id;
-    public Optional<Integer> direction_id;
-    public Optional<String> headsign;
-    public Optional<LocalTime> journey_start_time;
-    public Optional<String> next_stop_id;
-    public Optional<Integer> geohash_level;
-    public Optional<Double> topic_latitude;
-    public Optional<Double> topic_longitude;
-     */
-
-
-
     public static Optional<HfpMetadata> safeParseMetadata(String topic) throws Exception {
         try {
             return parseMetadata(topic);
@@ -94,6 +72,30 @@ public class MessageParser {
             log.error("Failed to find topic version from topic " + topic);
             return Optional.empty();
         }
+        meta.topic_version = versionIndex;
+
+
+
+    /*
+    public OffsetDateTime received_at;
+    public Optional<String> topic_prefix;
+    public String topic_version;
+    public JourneyType journey_type;
+    public boolean is_ongoing;
+    public TransportMode mode;
+    public int owner_operator_id;
+    public int vehicle_number;
+    public String unique_vehicle_id;
+    public Optional<String> route_id;
+    public Optional<Integer> direction_id;
+    public Optional<String> headsign;
+    public Optional<LocalTime> journey_start_time;
+    public Optional<String> next_stop_id;
+    public Optional<Integer> geohash_level;
+    public Optional<Double> topic_latitude;
+    public Optional<Double> topic_longitude;
+     */
+
 
         return Optional.of(meta);
     }

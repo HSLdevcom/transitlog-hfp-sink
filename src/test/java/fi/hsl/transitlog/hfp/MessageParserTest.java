@@ -3,6 +3,8 @@ package fi.hsl.transitlog.hfp;
 import org.junit.Test;
 
 import java.net.URL;
+import java.time.OffsetDateTime;
+import java.util.Optional;
 import java.util.Scanner;
 
 import static org.junit.Assert.*;
@@ -35,5 +37,20 @@ public class MessageParserTest {
         assertTrue(636 == hfp.VP.jrn);
         assertTrue(112 == hfp.VP.line);
         assertEquals("20:25", hfp.VP.start);
+    }
+
+    @Test
+    public void parseTopic() throws Exception {
+        HfpMetadata meta = parseAndValidateTopic("/hfp/v1/journey/ongoing/bus/0022/00854/4555B/2/Leppävaara/19:56/4150264/5/60;24/28/65/06");
+    }
+
+    private HfpMetadata parseAndValidateTopic(String topic) throws Exception {
+        OffsetDateTime now = OffsetDateTime.now();
+        Optional<HfpMetadata> maybeMeta = MessageParser.parseMetadata(topic, now);
+        assertTrue(maybeMeta.isPresent());
+        HfpMetadata meta = maybeMeta.get();
+        assertEquals(now, meta.received_at);
+        assertEquals("v1", meta.topic_version);
+        return meta;
     }
 }
