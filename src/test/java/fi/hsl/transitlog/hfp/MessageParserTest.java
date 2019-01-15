@@ -110,7 +110,7 @@ public class MessageParserTest {
 
     @Test
     public void parseTopicWhenItemsMissing() throws Exception {
-        HfpMetadata meta = parseAndValidateTopic("/hfp/v1/journey/ongoing//0022/00854////19:56//////");
+        HfpMetadata meta = parseAndValidateTopic("/hfp/v1/journey/ongoing//0022/00854//////////");
         assertEquals(HfpMetadata.JourneyType.journey, meta.journey_type);
         assertEquals(true, meta.is_ongoing);
         assertFalse(meta.mode.isPresent());
@@ -122,7 +122,7 @@ public class MessageParserTest {
         assertFalse(meta.route_id.isPresent());
         assertFalse(meta.direction_id.isPresent());
         assertFalse(meta.headsign.isPresent());
-        assertEquals(LocalTime.of(19, 56), meta.journey_start_time.get());
+        assertFalse(meta.journey_start_time.isPresent());
         assertFalse(meta.next_stop_id.isPresent());
         assertFalse(meta.geohash_level.isPresent());
 

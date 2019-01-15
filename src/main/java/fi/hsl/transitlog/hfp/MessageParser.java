@@ -92,7 +92,7 @@ public class MessageParser {
             meta.route_id = Optional.ofNullable(validateString(parts[index++]));
             meta.direction_id = Optional.ofNullable(safeParseInt(parts[index++]));
             meta.headsign = Optional.ofNullable(validateString(parts[index++]));
-            meta.journey_start_time = Optional.ofNullable(LocalTime.parse(parts[index++]));
+            meta.journey_start_time = Optional.ofNullable(safeParseLocalTime(parts[index++]));
             meta.next_stop_id = Optional.ofNullable(validateString(parts[index++]));
             meta.geohash_level = Optional.ofNullable(safeParseInt(parts[index++]));
         }
@@ -214,6 +214,20 @@ public class MessageParser {
             }
             catch (Exception e) {
                 log.error("Failed to convert {} to java.sql.Time", time);
+                return null;
+            }
+        }
+    }
+
+    static LocalTime safeParseLocalTime(String time) {
+        if (time == null)
+            return null;
+        else {
+            try {
+                return LocalTime.parse(time);
+            }
+            catch (Exception e) {
+                log.error("Failed to convert {} to LocalTime", time);
                 return null;
             }
         }
