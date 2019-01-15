@@ -64,7 +64,7 @@ public class MessageParser {
     }
 
     public static Optional<HfpMetadata> parseMetadata(String topic, OffsetDateTime receivedAt) throws Exception {
-        log.debug("Parsing metadata from topic: " + topic);
+        //log.debug("Parsing metadata from topic: " + topic);
 
         final String[] parts = topic.split("/", -1);//-1 to include empty substrings
 
@@ -99,10 +99,7 @@ public class MessageParser {
         else {
             log.warn("could not parse first batch of additional fields for topic {}", topic);
         }
-        //GeoHash is overloaded, if it's zero it means there's been some changes in the schedule,etc.
-        // Also if level is zero, then no other coordinates.
-        boolean isGeoHashOver0 = meta.geohash_level.map(level -> level > 0).orElse(false);
-        if (index + 4 <= parts.length && isGeoHashOver0) {
+        if (index + 4 <= parts.length) {
             Optional<GeoHash> maybeGeoHash = parseGeoHash(parts, index);
             meta.topic_latitude = maybeGeoHash.map(hash -> hash.latitude);
             meta.topic_longitude = maybeGeoHash.map(hash -> hash.longitude);

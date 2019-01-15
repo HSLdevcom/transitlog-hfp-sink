@@ -92,7 +92,8 @@ public class MessageParserTest {
     }
 
     @Test
-    public void parseZeroLevelGeohash() throws Exception {
+    public void parseMissingGeohash() throws Exception {
+        ///hfp/v1/journey/ongoing/bus/0012/01328/4560/1/Myyrmäki/04:57/4160299/0////
         HfpMetadata meta = parseAndValidateTopic("/hfp/v1/journey/ongoing/bus/0022/00854/4555B/2/Leppävaara/19:56/4150264/0////");
         assertEquals(0, (int)meta.geohash_level.get());
         assertFalse(meta.topic_latitude.isPresent());
@@ -100,8 +101,16 @@ public class MessageParserTest {
     }
 
     @Test
+    public void parseGeohashWithOverloadedZeroLevel() throws Exception {
+        HfpMetadata meta = parseAndValidateTopic("/hfp/v1/journey/ongoing/bus/0012/01825/1039/2/Kamppi/05:36/1320105/0/60;24/28/44/12");
+        assertEquals(0, (int)meta.geohash_level.get());
+        assertTrue(60.241 - meta.topic_latitude.get() < 0.00001);
+        assertTrue(24.842 - meta.topic_longitude.get() < 0.00001);
+    }
+
+    @Test
     public void parseTopicWhenItemsMissing() throws Exception {
-        HfpMetadata meta = parseAndValidateTopic("/hfp/v1/journey/ongoing//0022/00854////19:56///60;24/28/65/06");
+        HfpMetadata meta = parseAndValidateTopic("/hfp/v1/journey/ongoing//0022/00854////19:56//////");
         assertEquals(HfpMetadata.JourneyType.journey, meta.journey_type);
         assertEquals(true, meta.is_ongoing);
         assertFalse(meta.mode.isPresent());
@@ -139,8 +148,8 @@ public class MessageParserTest {
         assertFalse(meta.next_stop_id.isPresent());
         assertFalse(meta.geohash_level.isPresent());
 
-        assertFalse(meta.topic_latitude.isPresent());
-        assertFalse(meta.topic_longitude.isPresent());
+        assertTrue(60.260 - meta.topic_latitude.get() < 0.00001);
+        assertTrue(24.856 - meta.topic_longitude.get() < 0.00001);
 
     }
 

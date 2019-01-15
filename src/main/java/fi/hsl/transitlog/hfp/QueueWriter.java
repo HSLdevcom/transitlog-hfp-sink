@@ -56,16 +56,17 @@ public class QueueWriter {
     public void write(List<HfpData> messages) throws Exception {
         //TODO max batch size
         log.info("Writing {} rows to database", messages.size());
-        
+
         long startTime = System.currentTimeMillis();
         String queryString = createInsertStatement();
         try (PreparedStatement statement = connection.prepareStatement(queryString)) {
 
             for (HfpData data: messages) {
-                HfpMessage message = data.getPayload();
-
                 int index = 1;
-                statement.setTimestamp(index++, java.sql.Timestamp.valueOf(LocalDateTime.now(ZoneId.of("UTC"))));
+
+                final HfpMetadata meta = data.getMetadata();
+
+                statement.setTimestamp(index++, java.sql.Timestamp.from(meta.received_at.toInstant()));
                 statement.setString(index++,"topic_prefix");
                 statement.setString(index++,"topic_version");
                 statement.setString(index++, HfpMetadata.JourneyType.journey.toString());
@@ -76,6 +77,7 @@ public class QueueWriter {
                 statement.setString(index++, "1234");
 
                 //From payload:
+                final HfpMessage message = data.getPayload();
                 setNullable(index++, message.VP.desi, Types.VARCHAR, statement);
                 setNullable(index++, MessageParser.safeParseInt(message.VP.dir), Types.INTEGER, statement);
                 setNullable(index++, message.VP.oper, Types.INTEGER, statement);
