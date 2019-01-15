@@ -36,18 +36,20 @@ public class QueueWriter {
     private String createInsertStatement() {
         return new StringBuffer()
                 .append("INSERT INTO VEHICLES (")
-                .append("received_at, topic_prefix, topic_version,")
-                .append("journey_type, is_ongoing, mode,")
-                .append("owner_operator_id, vehicle_number, unique_vehicle_id,")
-                //TODO more fields
-                .append("desi, dir, oper,")
-                .append("veh, tst, tsi,")
-                .append("spd, hdg, lat,")
-                .append("long, acc, dl,")
-                .append("odo, drst, oday,")
+                .append("received_at, topic_prefix, topic_version, ")
+                .append("journey_type, is_ongoing, mode, ")
+                .append("owner_operator_id, vehicle_number, unique_vehicle_id, ")
+                .append("route_id, direction_id, headsign, ")
+                .append("journey_start_time, next_stop_id, geohash_level, ")
+                .append("topic_latitude, topic_longitude, ")
+                .append("desi, dir, oper, ")
+                .append("veh, tst, tsi, ")
+                .append("spd, hdg, lat, ")
+                .append("long, acc, dl, ")
+                .append("odo, drst, oday, ")
                 .append("jrn, line, start")
                 .append(") VALUES (")
-                .append("?, ?, ?, ?::JOURNEY_TYPE, ?, ?::TRANSPORT_MODE, ?, ?, ?,")
+                .append("?, ?, ?, ?::JOURNEY_TYPE, ?, ?::TRANSPORT_MODE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ")
                 .append("?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?")
                 .append(");")
                 .toString();
@@ -75,6 +77,15 @@ public class QueueWriter {
                 statement.setInt(index++, meta.owner_operator_id);
                 statement.setInt(index++, meta.vehicle_number);
                 statement.setString(index++, meta.unique_vehicle_id);
+
+                setNullable(index++, meta.route_id.orElse(null), Types.VARCHAR, statement);
+                setNullable(index++, meta.direction_id.orElse(null), Types.INTEGER, statement);
+                setNullable(index++, meta.headsign.orElse(null), Types.VARCHAR, statement);
+                setNullable(index++, meta.journey_start_time.map(java.sql.Time::valueOf).orElse(null), Types.TIME, statement);
+                setNullable(index++, meta.next_stop_id.orElse(null), Types.VARCHAR, statement);
+                setNullable(index++, meta.geohash_level.orElse(null), Types.INTEGER, statement);
+                setNullable(index++, meta.topic_latitude.orElse(null), Types.DOUBLE, statement);
+                setNullable(index++, meta.topic_longitude.orElse(null), Types.DOUBLE, statement);
 
                 //From payload:
                 final HfpMessage message = data.getPayload();
