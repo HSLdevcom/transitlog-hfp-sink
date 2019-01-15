@@ -67,14 +67,14 @@ public class QueueWriter {
                 final HfpMetadata meta = data.getMetadata();
 
                 statement.setTimestamp(index++, java.sql.Timestamp.from(meta.received_at.toInstant()));
-                statement.setString(index++,"topic_prefix");
-                statement.setString(index++,"topic_version");
-                statement.setString(index++, HfpMetadata.JourneyType.journey.toString());
-                statement.setBoolean(index++,true);
-                statement.setString(index++, HfpMetadata.TransportMode.bus.toString());
-                statement.setInt(index++, 0);
-                statement.setInt(index++, 1234);
-                statement.setString(index++, "1234");
+                statement.setString(index++, meta.topic_prefix);
+                statement.setString(index++, meta.topic_version);
+                statement.setString(index++, meta.journey_type.toString());
+                statement.setBoolean(index++, meta.is_ongoing);
+                setNullable(index++, meta.mode.map(mode -> mode.toString()).orElseGet(null), Types.VARCHAR, statement);
+                statement.setInt(index++, meta.owner_operator_id);
+                statement.setInt(index++, meta.vehicle_number);
+                statement.setString(index++, meta.unique_vehicle_id);
 
                 //From payload:
                 final HfpMessage message = data.getPayload();

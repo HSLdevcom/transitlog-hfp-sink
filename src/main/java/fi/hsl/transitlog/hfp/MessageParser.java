@@ -83,7 +83,7 @@ public class MessageParser {
         meta.topic_version = parts[index++];
 
         meta.journey_type = HfpMetadata.JourneyType.valueOf(parts[index++]);
-        meta.is_ongoing = "ongoing".equals(parts[index++]);// == "ongoing";
+        meta.is_ongoing = "ongoing".equals(parts[index++]);
         meta.mode = HfpMetadata.TransportMode.fromString(parts[index++]);
         meta.owner_operator_id = Integer.parseInt(parts[index++]);
         meta.vehicle_number = Integer.parseInt(parts[index++]);
@@ -120,30 +120,32 @@ public class MessageParser {
 
         int index = startIndex;
         final String firstLatLong = parts[index++];
-        String[] latLong0 = firstLatLong.split(";");
-        if (latLong0.length == 2) {
-            StringBuffer latitude = new StringBuffer(latLong0[0]).append(".");
-            StringBuffer longitude = new StringBuffer(latLong0[1]).append(".");
+        if (!firstLatLong.isEmpty()) {
+            String[] latLong0 = firstLatLong.split(";");
+            if (latLong0.length == 2) {
+                StringBuffer latitude = new StringBuffer(latLong0[0]).append(".");
+                StringBuffer longitude = new StringBuffer(latLong0[1]).append(".");
 
-            String latLong1 = parts[index++];
-            latitude.append(latLong1.substring(0, 1));
-            longitude.append(latLong1.substring(1, 2));
+                String latLong1 = parts[index++];
+                latitude.append(latLong1.substring(0, 1));
+                longitude.append(latLong1.substring(1, 2));
 
-            String latLong2 = parts[index++];
-            latitude.append(latLong2.substring(0, 1));
-            longitude.append(latLong2.substring(1, 2));
+                String latLong2 = parts[index++];
+                latitude.append(latLong2.substring(0, 1));
+                longitude.append(latLong2.substring(1, 2));
 
-            String latLong3 = parts[index++];
-            latitude.append(latLong3.substring(0, 1));
-            longitude.append(latLong3.substring(1, 2));
+                String latLong3 = parts[index++];
+                latitude.append(latLong3.substring(0, 1));
+                longitude.append(latLong3.substring(1, 2));
 
-            GeoHash geoHash = new GeoHash();
-            geoHash.latitude = Double.parseDouble(latitude.toString());
-            geoHash.longitude = Double.parseDouble(longitude.toString());
-            maybeGeoHash = Optional.of(geoHash);
-        }
-        else {
-            log.debug("Could not parse latitude & longitude from {}", firstLatLong);
+                GeoHash geoHash = new GeoHash();
+                geoHash.latitude = Double.parseDouble(latitude.toString());
+                geoHash.longitude = Double.parseDouble(longitude.toString());
+                maybeGeoHash = Optional.of(geoHash);
+            }
+            else {
+                log.debug("Could not parse latitude & longitude from {}", firstLatLong);
+            }
         }
 
         return maybeGeoHash;
