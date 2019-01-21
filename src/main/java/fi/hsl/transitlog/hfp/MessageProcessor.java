@@ -60,15 +60,22 @@ public class MessageProcessor implements IMqttMessageHandler {
         }, intervalInMs, intervalInMs, TimeUnit.MILLISECONDS);
     }
 
-    private void dump() {
+    private void dump() throws Exception {
         log.debug("Saving results");
-        //TODO implement
+        ArrayList<HfpData> copy;
+        synchronized (queue) {
+            copy = new ArrayList<>(queue);
+            queue.clear();
+        }
+        log.info("Writing {} messages to database", copy.size());
+        writer.write(copy);
     }
 
     @Override
     public void handleMessage(String topic, MqttMessage message) throws Exception {
         if (queue.size() > QUEUE_MAX_SIZE) {
-            log.warn("Queue full: " + QUEUE_MAX_SIZE);
+            //TODO we should somehow tell MQTT not to ack the message. however that doesn't fix the issue though.
+            log.error("Queue full: " + QUEUE_MAX_SIZE);
             return;
         }
 
@@ -84,15 +91,10 @@ public class MessageProcessor implements IMqttMessageHandler {
         }
 
         if (maybeHfp.isPresent() && maybeMetadata.isPresent()) {
-            queue.add(new HfpData(maybeMetadata.get(), maybeHfp.get()));
+            synchronized (queue) {
+                queue.add(new HfpData(maybeMetadata.get(), maybeHfp.get()));
+            }
         }
-
-        if (queue.size() % 1000 == 0) {
-            log.debug("Got messages: " + queue.size());
-            writer.write(queue);
-            queue.clear();
-        }
-
         /*
         if (queue.size() > QUEUE_MAX_SIZE) {
             log.warn("Queue full, removing oldest message");
