@@ -5,12 +5,16 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.LinkedList;
+
 public class MqttApplication implements MqttCallback {
     private static final Logger log = LoggerFactory.getLogger(MqttApplication.class);
 
     private MqttConfig config;
     private MqttAsyncClient mqttClient;
     private String mqttTopic;
+
+    private final LinkedList<IMqttMessageHandler> handlers = new LinkedList<>();
 
     //TODO READ QOS FROM CONFIG
     public static final int DEFAULT_QOS = 1;
@@ -69,15 +73,17 @@ public class MqttApplication implements MqttCallback {
 
     @Override
     public void connectionLost(Throwable cause) {
-        log.error("Connection to mqtt broker lost", cause);
+        log.error("Connection to mqtt broker lost, notifying clients", cause);
+        for (IMqttMessageHandler handler: handlers) {
+            handler.connectionLost(cause);
+        }
         close();
     }
 
     @Override
     public void messageArrived(String topic, MqttMessage message) throws Exception {
-        //TODO possibly queue messages here and offer some loop
-        //TODO think about the need for this abstraction
-
+        //Paho never calls this MqttCallback-method which is weird.
+        //Message events are received after subscribing to the client.
     }
 
     @Override
@@ -86,17 +92,17 @@ public class MqttApplication implements MqttCallback {
     public void subscribe(final IMqttMessageHandler handler) throws Exception {
 
         mqttClient.subscribe(mqttTopic, DEFAULT_QOS, new IMqttMessageListener() {
-            //TODO think about this, perhaps some error handling could be in place
             @Override
             public void messageArrived(String topic, MqttMessage message) throws Exception {
                 handler.handleMessage(topic, message);
             }
         });
+        handlers.add(handler);
     }
 
     public void close() {
-        log.info("Closing MqttApplication resources");
         try {
+            log.info("Closing MqttApplication resources");
             //Paho doesn't close the connection threads unless we force-close it.
             //mqttClient.unsubscribe(mqttTopic);
             //mqttClient.disconnect();

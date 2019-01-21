@@ -70,7 +70,7 @@ public class Main {
         catch (Exception e) {
             log.error("Exception at main", e);
             if (processor != null) {
-                processor.close();
+                processor.close(false);
             }
             if (app != null) {
                 app.close();

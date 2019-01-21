@@ -55,7 +55,7 @@ public class MessageProcessor implements IMqttMessageHandler {
             }
             catch (Exception e) {
                 log.error("Failed to check results, closing application", e);
-                close();
+                close(true);
             }
         }, intervalInMs, intervalInMs, TimeUnit.MILLISECONDS);
     }
@@ -102,11 +102,19 @@ public class MessageProcessor implements IMqttMessageHandler {
         }*/
     }
 
-    public void close() {
-        log.warn("Closing application");
+    @Override
+    public void connectionLost(Throwable cause) {
+        //Let mqtt connection handler clean up itself
+        close(false);
+    }
+
+    public void close(boolean closeMqtt) {
+        log.warn("Closing MessageProcessor resources");
         scheduler.shutdown();
         log.info("Scheduler shutdown finished");
-        app.close();
-        log.info("Application closed");
+        if (closeMqtt) {
+            app.close();
+            log.info("MQTT connection closed");
+        }
     }
 }
