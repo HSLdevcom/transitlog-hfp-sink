@@ -59,17 +59,22 @@ public class Main {
 
         log.info("Configurations read, launching the main loop");
         MqttApplication app = null;
+        MessageProcessor processor = null;
         try {
             app = MqttApplication.newInstance(mqttConfig);
 
             QueueWriter writer = QueueWriter.newInstance(config);
-            MessageProcessor processor = MessageProcessor.newInstance(app, writer);
+            processor = MessageProcessor.newInstance(config, app, writer);
             log.info("Starting to process messages");
         }
         catch (Exception e) {
             log.error("Exception at main", e);
-            if (app != null)
+            if (processor != null) {
+                processor.close(false);
+            }
+            if (app != null) {
                 app.close();
+            }
         }
 
     }
