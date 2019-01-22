@@ -2,7 +2,6 @@ package fi.hsl.transitlog.hfp;
 
 import com.typesafe.config.Config;
 import fi.hsl.common.config.ConfigParser;
-import fi.hsl.common.config.ConfigUtils;
 import fi.hsl.transitlog.mqtt.MqttConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,11 +27,11 @@ public class Main {
         String password = "";
         try {
             //Default path is what works with Docker out-of-the-box. Override with a local file if needed
-            final String usernamePath = ConfigUtils.getEnv("FILEPATH_USERNAME_SECRET").orElse("/run/secrets/mqtt_broker_username");
+            final String usernamePath = config.getString("mqtt-broker.usernameFilepath");
             log.debug("Reading username from " + usernamePath);
             username = new Scanner(new File(usernamePath)).useDelimiter("\\Z").next();
 
-            final String passwordPath = ConfigUtils.getEnv("FILEPATH_PASSWORD_SECRET").orElse("/run/secrets/mqtt_broker_password");
+            final String passwordPath = config.getString("mqtt-broker.passwordFilepath");
             log.debug("Reading password from " + passwordPath);
             password = new Scanner(new File(passwordPath)).useDelimiter("\\Z").next();
 
