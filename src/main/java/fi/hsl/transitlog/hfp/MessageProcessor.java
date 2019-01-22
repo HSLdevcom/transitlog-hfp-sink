@@ -2,7 +2,7 @@ package fi.hsl.transitlog.hfp;
 
 import com.typesafe.config.Config;
 import fi.hsl.transitlog.mqtt.IMqttMessageHandler;
-import fi.hsl.transitlog.mqtt.MqttApplication;
+import fi.hsl.transitlog.mqtt.MqttConnector;
 
 import org.eclipse.paho.client.mqttv3.*;
 import org.slf4j.Logger;
@@ -22,22 +22,22 @@ public class MessageProcessor implements IMqttMessageHandler {
     final int QUEUE_MAX_SIZE = 100000;
     final MessageParser parser = MessageParser.newInstance();
     final QueueWriter writer;
-    final MqttApplication app;
+    final MqttConnector connector;
 
     ScheduledExecutorService scheduler;
 
-    private MessageProcessor(MqttApplication app, QueueWriter writer) {
+    private MessageProcessor(MqttConnector connector, QueueWriter writer) {
         queue = new ArrayList<>(QUEUE_MAX_SIZE);
-        this.app = app;
+        this.connector = connector;
         this.writer = writer;
     }
 
-    public static MessageProcessor newInstance(Config config, MqttApplication app, QueueWriter writer) throws Exception {
+    public static MessageProcessor newInstance(Config config, MqttConnector connector, QueueWriter writer) throws Exception {
         final long intervalInMs = config.getDuration("application.dumpInterval", TimeUnit.MILLISECONDS);
 
-        MessageProcessor processor = new MessageProcessor(app, writer);
-        log.info("MessageProcessor subscribing to MQTT Application");
-        app.subscribe(processor);
+        MessageProcessor processor = new MessageProcessor(connector, writer);
+        log.info("MessageProcessor subscribing to receive MQTT events");
+        connector.subscribe(processor);
 
         log.info("Let's start the dump-executor");
         processor.startDumpExecutor(intervalInMs);
@@ -67,8 +67,14 @@ public class MessageProcessor implements IMqttMessageHandler {
             copy = new ArrayList<>(queue);
             queue.clear();
         }
-        log.info("Writing {} messages to database", copy.size());
-        writer.write(copy);
+
+        if (copy.isEmpty()) {
+            log.info("Queue empty, no messages to write to database");
+        }
+        else {
+            log.info("Writing {} messages to database", copy.size());
+            writer.write(copy);
+        }
     }
 
     @Override
@@ -120,7 +126,7 @@ public class MessageProcessor implements IMqttMessageHandler {
         scheduler.shutdown();
         log.info("Scheduler shutdown finished");
         if (closeMqtt) {
-            app.close();
+            connector.close();
             log.info("MQTT connection closed");
         }
     }
