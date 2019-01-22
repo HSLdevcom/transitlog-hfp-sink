@@ -56,7 +56,6 @@ public class QueueWriter {
     }
 
     public void write(List<HfpData> messages) throws Exception {
-        //TODO max batch size
         log.info("Writing {} rows to database", messages.size());
 
         long startTime = System.currentTimeMillis();

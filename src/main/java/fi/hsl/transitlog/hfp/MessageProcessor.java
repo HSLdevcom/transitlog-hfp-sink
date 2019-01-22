@@ -67,8 +67,14 @@ public class MessageProcessor implements IMqttMessageHandler {
             copy = new ArrayList<>(queue);
             queue.clear();
         }
-        log.info("Writing {} messages to database", copy.size());
-        writer.write(copy);
+
+        if (copy.isEmpty()) {
+            log.info("Queue empty, no messages to write to database");
+        }
+        else {
+            log.info("Writing {} messages to database", copy.size());
+            writer.write(copy);
+        }
     }
 
     @Override
