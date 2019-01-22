@@ -94,11 +94,8 @@ public class MqttConnector implements MqttCallback {
 
     public void subscribe(final IMqttMessageHandler handler) throws Exception {
 
-        mqttClient.subscribe(mqttTopic, qos, new IMqttMessageListener() {
-            @Override
-            public void messageArrived(String topic, MqttMessage message) throws Exception {
-                handler.handleMessage(topic, message);
-            }
+        mqttClient.subscribe(mqttTopic, qos, (String topic, MqttMessage message) -> {
+            handler.handleMessage(topic, message);
         });
         handlers.add(handler);
     }
