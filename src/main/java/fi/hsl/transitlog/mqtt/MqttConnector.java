@@ -10,7 +10,6 @@ import java.util.LinkedList;
 public class MqttConnector implements MqttCallback {
     private static final Logger log = LoggerFactory.getLogger(MqttConnector.class);
 
-    private MqttConfig config;
     private MqttAsyncClient mqttClient;
     private String mqttTopic;
 
@@ -23,15 +22,11 @@ public class MqttConnector implements MqttCallback {
     MqttConnector(MqttAsyncClient client, String topic) {
         this.mqttClient = client;
         this.mqttTopic = topic;
-        mqttClient.setCallback(this);//TODO move to happen before connect so we won't lose messages
-    }
-
-    public MqttConfig getConfig() {
-        return config;
     }
 
     public static MqttConnector newInstance(MqttConfig config) throws Exception {
         MqttAsyncClient mqttClient = null;
+        MqttConnector connector = null;
         try {
             MqttConnectOptions connectOptions = new MqttConnectOptions();
             connectOptions.setCleanSession(false); //WHY FALSE? WHY NOT TRUE?
@@ -45,6 +40,9 @@ public class MqttConnector implements MqttCallback {
             MemoryPersistence memoryPersistence = new MemoryPersistence();
 
             mqttClient = new MqttAsyncClient(config.getBroker(), config.getClientId(), memoryPersistence);
+
+            connector = new MqttConnector(mqttClient, config.getMqttTopic());
+            mqttClient.setCallback(connector); //Let's add the callback before connecting so we won't lose any messages
 
             log.info(String.format("Connecting to mqtt broker %s", config.getBroker()));
             IMqttToken token = mqttClient.connect(connectOptions, null, new IMqttActionListener() {
@@ -68,7 +66,7 @@ public class MqttConnector implements MqttCallback {
             }
             throw e;
         }
-        return new MqttConnector(mqttClient, config.getMqttTopic());
+        return connector;
     }
 
     @Override
@@ -103,9 +101,7 @@ public class MqttConnector implements MqttCallback {
     public void close() {
         try {
             log.info("Closing MqttConnector resources");
-            //Paho doesn't close the connection threads unless we force-close it.
-            //mqttClient.unsubscribe(mqttTopic);
-            //mqttClient.disconnect();
+            //Paho doesn't close the connection threads unless we first disconnect and then force-close it.
             mqttClient.disconnectForcibly(5000L);
             mqttClient.close(true);
         }
