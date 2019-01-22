@@ -13,16 +13,14 @@ public class MqttConnector implements MqttCallback {
 
     private MqttAsyncClient mqttClient;
     private String mqttTopic;
+    private int qos;
 
     private final LinkedList<IMqttMessageHandler> handlers = new LinkedList<>();
 
-    //TODO READ QOS FROM CONFIG
-    public static final int DEFAULT_QOS = 1;
-
-
-    MqttConnector(MqttAsyncClient client, String topic) {
+    MqttConnector(MqttAsyncClient client, String topic, int QoS) {
         this.mqttClient = client;
         this.mqttTopic = topic;
+        this.qos = QoS;
     }
 
     public static MqttConnector newInstance(Config config, String username, String password) throws Exception {
@@ -33,6 +31,7 @@ public class MqttConnector implements MqttCallback {
             final String broker = config.getString("mqtt-broker.host");
             final int maxInFlight = config.getInt("mqtt-broker.maxInflight");
             final String topic = config.getString("mqtt-broker.topic");
+            final int QoS = config.getInt("mqtt-broker.qos");
 
             MqttConnectOptions connectOptions = new MqttConnectOptions();
             connectOptions.setCleanSession(false); //WHY FALSE? WHY NOT TRUE?
@@ -47,7 +46,7 @@ public class MqttConnector implements MqttCallback {
 
             mqttClient = new MqttAsyncClient(broker, clientId, memoryPersistence);
 
-            connector = new MqttConnector(mqttClient, topic);
+            connector = new MqttConnector(mqttClient, topic, QoS);
             mqttClient.setCallback(connector); //Let's add the callback before connecting so we won't lose any messages
 
             log.info(String.format("Connecting to mqtt broker %s", broker));
@@ -95,7 +94,7 @@ public class MqttConnector implements MqttCallback {
 
     public void subscribe(final IMqttMessageHandler handler) throws Exception {
 
-        mqttClient.subscribe(mqttTopic, DEFAULT_QOS, new IMqttMessageListener() {
+        mqttClient.subscribe(mqttTopic, qos, new IMqttMessageListener() {
             @Override
             public void messageArrived(String topic, MqttMessage message) throws Exception {
                 handler.handleMessage(topic, message);
