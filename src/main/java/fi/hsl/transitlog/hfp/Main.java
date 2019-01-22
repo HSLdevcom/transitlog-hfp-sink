@@ -3,7 +3,7 @@ package fi.hsl.transitlog.hfp;
 import com.typesafe.config.Config;
 import fi.hsl.common.config.ConfigParser;
 import fi.hsl.common.config.ConfigUtils;
-import fi.hsl.transitlog.mqtt.MqttApplication;
+import fi.hsl.transitlog.mqtt.MqttConnector;
 import fi.hsl.transitlog.mqtt.MqttConfig;
 import fi.hsl.transitlog.mqtt.MqttConfigBuilder;
 import org.slf4j.Logger;
@@ -58,13 +58,13 @@ public class Main {
         MqttConfig mqttConfig = createMqttConfig(config);
 
         log.info("Configurations read, launching the main loop");
-        MqttApplication app = null;
+        MqttConnector connector = null;
         MessageProcessor processor = null;
         try {
-            app = MqttApplication.newInstance(mqttConfig);
+            connector = MqttConnector.newInstance(mqttConfig);
 
             QueueWriter writer = QueueWriter.newInstance(config);
-            processor = MessageProcessor.newInstance(config, app, writer);
+            processor = MessageProcessor.newInstance(config, connector, writer);
             log.info("Starting to process messages");
         }
         catch (Exception e) {
@@ -72,8 +72,8 @@ public class Main {
             if (processor != null) {
                 processor.close(false);
             }
-            if (app != null) {
-                app.close();
+            if (connector != null) {
+                connector.close();
             }
         }
 

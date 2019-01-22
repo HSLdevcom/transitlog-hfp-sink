@@ -7,8 +7,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.LinkedList;
 
-public class MqttApplication implements MqttCallback {
-    private static final Logger log = LoggerFactory.getLogger(MqttApplication.class);
+public class MqttConnector implements MqttCallback {
+    private static final Logger log = LoggerFactory.getLogger(MqttConnector.class);
 
     private MqttConfig config;
     private MqttAsyncClient mqttClient;
@@ -20,7 +20,7 @@ public class MqttApplication implements MqttCallback {
     public static final int DEFAULT_QOS = 1;
 
 
-    MqttApplication(MqttAsyncClient client, String topic) {
+    MqttConnector(MqttAsyncClient client, String topic) {
         this.mqttClient = client;
         this.mqttTopic = topic;
         mqttClient.setCallback(this);//TODO move to happen before connect so we won't lose messages
@@ -30,7 +30,7 @@ public class MqttApplication implements MqttCallback {
         return config;
     }
 
-    public static MqttApplication newInstance(MqttConfig config) throws Exception {
+    public static MqttConnector newInstance(MqttConfig config) throws Exception {
         MqttAsyncClient mqttClient = null;
         try {
             MqttConnectOptions connectOptions = new MqttConnectOptions();
@@ -68,7 +68,7 @@ public class MqttApplication implements MqttCallback {
             }
             throw e;
         }
-        return new MqttApplication(mqttClient, config.getMqttTopic());
+        return new MqttConnector(mqttClient, config.getMqttTopic());
     }
 
     @Override
@@ -102,7 +102,7 @@ public class MqttApplication implements MqttCallback {
 
     public void close() {
         try {
-            log.info("Closing MqttApplication resources");
+            log.info("Closing MqttConnector resources");
             //Paho doesn't close the connection threads unless we force-close it.
             //mqttClient.unsubscribe(mqttTopic);
             //mqttClient.disconnect();
