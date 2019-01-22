@@ -4,8 +4,6 @@ import com.typesafe.config.Config;
 import fi.hsl.common.config.ConfigParser;
 import fi.hsl.common.config.ConfigUtils;
 import fi.hsl.transitlog.mqtt.MqttConnector;
-import fi.hsl.transitlog.mqtt.MqttConfig;
-import fi.hsl.transitlog.mqtt.MqttConfigBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +14,16 @@ public class Main {
 
     private static final Logger log = LoggerFactory.getLogger(Main.class);
 
-    private static MqttConfig createMqttConfig(Config config) {
+    static class Credentials {
+        String username;
+        String password;
+        public Credentials(String user, String pw) {
+            username = user;
+            password = pw;
+        }
+    }
+
+    private static Credentials readMqttCredentials(Config config) {
         String username = "";
         String password = "";
         try {
@@ -33,21 +40,7 @@ public class Main {
             log.error("Failed to read secret files", e);
         }
 
-        final String clientId = config.getString("mqtt-broker.clientId");
-        final String broker = config.getString("mqtt-broker.host");
-        final int maxInFlight = config.getInt("mqtt-broker.maxInflight");
-        final String topic = config.getString("mqtt-broker.topic");
-        log.info("Setting MQTT topic to {} ", topic);
-
-        MqttConfigBuilder configBuilder = MqttConfig.newBuilder()
-                .setBroker(broker)
-                .setUsername(username)
-                .setPassword(password)
-                .setClientId(clientId)
-                .setMqttTopic(topic)
-                .setMaxInflight(maxInFlight);
-
-        return configBuilder.build();
+        return new Credentials(username, password);
     }
 
 
@@ -55,13 +48,13 @@ public class Main {
         log.info("Launching Transitdata-HFP-Source.");
 
         Config config = ConfigParser.createConfig();
-        MqttConfig mqttConfig = createMqttConfig(config);
+        Credentials credentials = readMqttCredentials(config);
 
         log.info("Configurations read, launching the main loop");
         MqttConnector connector = null;
         MessageProcessor processor = null;
         try {
-            connector = MqttConnector.newInstance(mqttConfig);
+            connector = MqttConnector.newInstance(config, credentials.username, credentials.password);
 
             QueueWriter writer = QueueWriter.newInstance(config);
             processor = MessageProcessor.newInstance(config, connector, writer);

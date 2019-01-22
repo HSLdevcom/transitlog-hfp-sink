@@ -1,5 +1,6 @@
 package fi.hsl.transitlog.mqtt;
 
+import com.typesafe.config.Config;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.slf4j.Logger;
@@ -24,27 +25,32 @@ public class MqttConnector implements MqttCallback {
         this.mqttTopic = topic;
     }
 
-    public static MqttConnector newInstance(MqttConfig config) throws Exception {
+    public static MqttConnector newInstance(Config config, String username, String password) throws Exception {
         MqttAsyncClient mqttClient = null;
         MqttConnector connector = null;
         try {
+            final String clientId = config.getString("mqtt-broker.clientId");
+            final String broker = config.getString("mqtt-broker.host");
+            final int maxInFlight = config.getInt("mqtt-broker.maxInflight");
+            final String topic = config.getString("mqtt-broker.topic");
+
             MqttConnectOptions connectOptions = new MqttConnectOptions();
             connectOptions.setCleanSession(false); //WHY FALSE? WHY NOT TRUE?
-            connectOptions.setMaxInflight(config.getMaxInflight());
+            connectOptions.setMaxInflight(maxInFlight);
             connectOptions.setAutomaticReconnect(false); //Let's abort on connection errors
 
-            connectOptions.setUserName(config.getUsername());
-            connectOptions.setPassword(config.getPassword().toCharArray());
+            connectOptions.setUserName(username);
+            connectOptions.setPassword(password.toCharArray());
 
             //Let's use memory persistance to optimize throughput.
             MemoryPersistence memoryPersistence = new MemoryPersistence();
 
-            mqttClient = new MqttAsyncClient(config.getBroker(), config.getClientId(), memoryPersistence);
+            mqttClient = new MqttAsyncClient(broker, clientId, memoryPersistence);
 
-            connector = new MqttConnector(mqttClient, config.getMqttTopic());
+            connector = new MqttConnector(mqttClient, topic);
             mqttClient.setCallback(connector); //Let's add the callback before connecting so we won't lose any messages
 
-            log.info(String.format("Connecting to mqtt broker %s", config.getBroker()));
+            log.info(String.format("Connecting to mqtt broker %s", broker));
             IMqttToken token = mqttClient.connect(connectOptions, null, new IMqttActionListener() {
                 public void onSuccess(IMqttToken asyncActionToken) {
                     log.info("Connected");
