@@ -104,6 +104,13 @@ public class MessageProcessor implements IMqttMessageHandler {
 
     @Override
     public void connectionLost(Throwable cause) {
+        try {
+            log.info("Mqtt connection lost, saving queue to DB before exit");
+            dump();
+        }
+        catch (Exception e) {
+            log.error("Failed to dump queue to DB at connectionLost", e);
+        }
         //Let mqtt connection handler clean up itself
         close(false);
     }
