@@ -2,6 +2,8 @@ package fi.hsl.transitlog.hfp;
 
 import com.typesafe.config.Config;
 import fi.hsl.common.config.ConfigParser;
+import fi.hsl.common.pulsar.PulsarApplication;
+import fi.hsl.common.pulsar.PulsarApplicationContext;
 import fi.hsl.transitlog.mqtt.MqttConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,51 +15,21 @@ public class Main {
 
     private static final Logger log = LoggerFactory.getLogger(Main.class);
 
-    static class Credentials {
-        String username;
-        String password;
-        public Credentials(String user, String pw) {
-            username = user;
-            password = pw;
-        }
-    }
-
-    private static Credentials readMqttCredentials(Config config) {
-        String username = "";
-        String password = "";
-        try {
-            //Default path is what works with Docker out-of-the-box. Override with a local file if needed
-            final String usernamePath = config.getString("mqtt-broker.usernameFilepath");
-            log.debug("Reading username from " + usernamePath);
-            username = new Scanner(new File(usernamePath)).useDelimiter("\\Z").next();
-
-            final String passwordPath = config.getString("mqtt-broker.passwordFilepath");
-            log.debug("Reading password from " + passwordPath);
-            password = new Scanner(new File(passwordPath)).useDelimiter("\\Z").next();
-
-        } catch (Exception e) {
-            log.error("Failed to read secret files", e);
-        }
-
-        return new Credentials(username, password);
-    }
-
 
     public static void main(String[] args) {
         log.info("Launching Transitdata-HFP-Source.");
 
         Config config = ConfigParser.createConfig();
-        Credentials credentials = readMqttCredentials(config);
 
-        log.info("Configurations read, launching the main loop");
+        log.info("Configuration read, launching the main loop");
         MqttConnector connector = null;
         MessageProcessor processor = null;
-        try {
-            connector = MqttConnector.newInstance(config, credentials.username, credentials.password);
-
+        try (PulsarApplication app = PulsarApplication.newInstance(config)) {
             QueueWriter writer = QueueWriter.newInstance(config);
-            processor = MessageProcessor.newInstance(config, connector, writer);
+            processor = MessageProcessor.newInstance(config, writer);
             log.info("Starting to process messages");
+
+            app.launchWithHandler();
         }
         catch (Exception e) {
             log.error("Exception at main", e);

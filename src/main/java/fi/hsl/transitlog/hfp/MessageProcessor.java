@@ -1,10 +1,9 @@
 package fi.hsl.transitlog.hfp;
 
 import com.typesafe.config.Config;
-import fi.hsl.transitlog.mqtt.IMqttMessageHandler;
-import fi.hsl.transitlog.mqtt.MqttConnector;
+import fi.hsl.common.pulsar.IMessageHandler;
 
-import org.eclipse.paho.client.mqttv3.*;
+import org.apache.pulsar.client.api.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +13,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class MessageProcessor implements IMqttMessageHandler {
+public class MessageProcessor implements IMessageHandler {
 
     private static final Logger log = LoggerFactory.getLogger(MessageProcessor.class);
 
@@ -22,23 +21,18 @@ public class MessageProcessor implements IMqttMessageHandler {
     final int QUEUE_MAX_SIZE = 100000;
     final MessageParser parser = MessageParser.newInstance();
     final QueueWriter writer;
-    final MqttConnector connector;
 
     ScheduledExecutorService scheduler;
 
-    private MessageProcessor(MqttConnector connector, QueueWriter writer) {
+    private MessageProcessor(QueueWriter writer) {
         queue = new ArrayList<>(QUEUE_MAX_SIZE);
-        this.connector = connector;
         this.writer = writer;
     }
 
-    public static MessageProcessor newInstance(Config config, MqttConnector connector, QueueWriter writer) throws Exception {
+    public static MessageProcessor newInstance(Config config, QueueWriter writer) throws Exception {
         final long intervalInMs = config.getDuration("application.dumpInterval", TimeUnit.MILLISECONDS);
 
-        MessageProcessor processor = new MessageProcessor(connector, writer);
-        log.info("MessageProcessor subscribing to receive MQTT events");
-        connector.subscribe(processor);
-
+        MessageProcessor processor = new MessageProcessor(writer);
         log.info("Let's start the dump-executor");
         processor.startDumpExecutor(intervalInMs);
         return processor;
@@ -75,6 +69,11 @@ public class MessageProcessor implements IMqttMessageHandler {
             log.info("Writing {} messages to database", copy.size());
             writer.write(copy);
         }
+    }
+
+    @Override
+    public void handleMessage(Message message) throws Exception {
+
     }
 
     @Override
@@ -130,4 +129,5 @@ public class MessageProcessor implements IMqttMessageHandler {
             log.info("MQTT connection closed");
         }
     }
+
 }
