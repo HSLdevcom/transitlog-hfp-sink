@@ -1,44 +1,46 @@
 package fi.hsl.transitlog.hfp;
 
-import com.typesafe.config.Config;
-import fi.hsl.transitlog.mqtt.IMqttMessageHandler;
-import fi.hsl.transitlog.mqtt.MqttConnector;
+import fi.hsl.common.hfp.proto.Hfp;
+import fi.hsl.common.pulsar.IMessageHandler;
 
-import org.eclipse.paho.client.mqttv3.*;
+import fi.hsl.common.pulsar.PulsarApplication;
+import fi.hsl.common.pulsar.PulsarApplicationContext;
+import fi.hsl.common.transitdata.TransitdataProperties;
+import fi.hsl.common.transitdata.TransitdataSchema;
+import org.apache.pulsar.client.api.Consumer;
+import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.MessageId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class MessageProcessor implements IMqttMessageHandler {
+public class MessageProcessor implements IMessageHandler {
 
     private static final Logger log = LoggerFactory.getLogger(MessageProcessor.class);
 
-    final ArrayList<HfpData> queue;
+    final ArrayList<Hfp.Data> queue;
     final int QUEUE_MAX_SIZE = 100000;
-    final MessageParser parser = MessageParser.newInstance();
     final QueueWriter writer;
-    final MqttConnector connector;
+    private final Consumer<byte[]> consumer;
+    private final PulsarApplication application;
 
     ScheduledExecutorService scheduler;
 
-    private MessageProcessor(MqttConnector connector, QueueWriter writer) {
+    private MessageProcessor(PulsarApplication app, QueueWriter w) {
         queue = new ArrayList<>(QUEUE_MAX_SIZE);
-        this.connector = connector;
-        this.writer = writer;
+        writer = w;
+        consumer = app.getContext().getConsumer();
+        application = app;
     }
 
-    public static MessageProcessor newInstance(Config config, MqttConnector connector, QueueWriter writer) throws Exception {
-        final long intervalInMs = config.getDuration("application.dumpInterval", TimeUnit.MILLISECONDS);
+    public static MessageProcessor newInstance(PulsarApplication app, QueueWriter writer) throws Exception {
+        final long intervalInMs = app.getContext().getConfig().getDuration("application.dumpInterval", TimeUnit.MILLISECONDS);
 
-        MessageProcessor processor = new MessageProcessor(connector, writer);
-        log.info("MessageProcessor subscribing to receive MQTT events");
-        connector.subscribe(processor);
-
+        MessageProcessor processor = new MessageProcessor(app, writer);
         log.info("Let's start the dump-executor");
         processor.startDumpExecutor(intervalInMs);
         return processor;
@@ -62,7 +64,7 @@ public class MessageProcessor implements IMqttMessageHandler {
 
     private void dump() throws Exception {
         log.debug("Saving results");
-        ArrayList<HfpData> copy;
+        ArrayList<Hfp.Data> copy;
         synchronized (queue) {
             copy = new ArrayList<>(queue);
             queue.clear();
@@ -78,56 +80,42 @@ public class MessageProcessor implements IMqttMessageHandler {
     }
 
     @Override
-    public void handleMessage(String topic, MqttMessage message) throws Exception {
+    public void handleMessage(Message message) throws Exception {
         if (queue.size() > QUEUE_MAX_SIZE) {
-            //TODO we should somehow tell MQTT not to ack the message. however that doesn't fix the issue though.
+            //TODO think what to do if queue is full!
             log.error("Queue full: " + QUEUE_MAX_SIZE);
             return;
         }
 
-        Optional<HfpMetadata> maybeMetadata = MessageParser.safeParseMetadata(topic);
-        if (!maybeMetadata.isPresent()) {
-            log.warn("Failed to parse hfp metadata from MQTT topic");
-        }
-
-
-        Optional<HfpMessage> maybeHfp = parser.safeParse(message);
-        if (!maybeHfp.isPresent()) {
-            log.warn("Failed to parse hfp payload from MQTT message");
-        }
-
-        if (maybeHfp.isPresent() && maybeMetadata.isPresent()) {
+        if (TransitdataSchema.hasProtobufSchema(message, TransitdataProperties.ProtobufSchema.HfpData)) {
+            Hfp.Data data = Hfp.Data.parseFrom(message.getData());
             synchronized (queue) {
-                queue.add(new HfpData(maybeMetadata.get(), maybeHfp.get()));
+                queue.add(data);
             }
         }
-        /*
-        if (queue.size() > QUEUE_MAX_SIZE) {
-            log.warn("Queue full, removing oldest message");
-            queue.removeFirst();
-        }*/
+        else {
+            log.warn("Invalid protobuf schema, expecting HfpData");
+        }
+        ack(message.getMessageId());
     }
 
-    @Override
-    public void connectionLost(Throwable cause) {
-        try {
-            log.info("Mqtt connection lost, saving queue to DB before exit");
-            dump();
-        }
-        catch (Exception e) {
-            log.error("Failed to dump queue to DB at connectionLost", e);
-        }
-        //Let mqtt connection handler clean up itself
-        close(false);
+    private void ack(MessageId received) {
+        consumer.acknowledgeAsync(received)
+                .exceptionally(throwable -> {
+                    log.error("Failed to ack Pulsar message", throwable);
+                    return null;
+                })
+                .thenRun(() -> {});
     }
 
-    public void close(boolean closeMqtt) {
+    public void close(boolean closePulsar) {
         log.warn("Closing MessageProcessor resources");
         scheduler.shutdown();
         log.info("Scheduler shutdown finished");
-        if (closeMqtt) {
-            connector.close();
-            log.info("MQTT connection closed");
+        if (closePulsar && application != null) {
+            log.info("Closing also Pulsar application");
+            application.close();
         }
     }
+
 }

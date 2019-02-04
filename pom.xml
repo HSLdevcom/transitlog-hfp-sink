@@ -2,7 +2,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>fi.hsl.transitlog</groupId>
     <artifactId>transitlog-hfp-source</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -10,15 +10,10 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <pulsar.version>2.1.0-incubating</pulsar.version>
-        <common.version>0.6.1</common.version>
-        <paho.version>1.2.0</paho.version>
+        <common.version>0.7.1</common.version>
     </properties>
 
     <repositories>
-        <repository>
-            <id>Eclipse Paho Repo</id>
-            <url>https://repo.eclipse.org/content/repositories/paho-releases/</url>
-        </repository>
         <repository>
           <id>bintray</id>
           <name>bintray</name>
@@ -34,21 +29,9 @@
         </dependency>
 
         <dependency>
-            <groupId>org.eclipse.paho</groupId>
-            <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
-            <version>${paho.version}</version>
-        </dependency>
-
-        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <version>42.2.5</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.dslplatform</groupId>
-            <artifactId>dsl-json-java8</artifactId>
-            <version>1.8.4</version>
         </dependency>
 
         <dependency>

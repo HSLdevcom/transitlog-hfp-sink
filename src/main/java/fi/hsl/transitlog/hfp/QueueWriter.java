@@ -1,15 +1,17 @@
 package fi.hsl.transitlog.hfp;
 
 import com.typesafe.config.Config;
+import fi.hsl.common.hfp.HfpParser;
+import fi.hsl.common.hfp.proto.Hfp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.*;
-import java.text.NumberFormat;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
+
 import static java.sql.Types.*;
 
 public class QueueWriter {
@@ -55,59 +57,80 @@ public class QueueWriter {
                 .toString();
     }
 
-    public void write(List<HfpData> messages) throws Exception {
+    public void write(List<Hfp.Data> messages) throws Exception {
         log.info("Writing {} rows to database", messages.size());
 
         long startTime = System.currentTimeMillis();
         String queryString = createInsertStatement();
         try (PreparedStatement statement = connection.prepareStatement(queryString)) {
 
-            for (HfpData data: messages) {
+            for (Hfp.Data data: messages) {
                 int index = 1;
 
-                final HfpMetadata meta = data.getMetadata();
+                final Hfp.Topic meta = data.getTopic();
 
-                statement.setTimestamp(index++, java.sql.Timestamp.from(meta.received_at.toInstant()));
-                statement.setString(index++, meta.topic_prefix);
-                statement.setString(index++, meta.topic_version);
-                statement.setString(index++, meta.journey_type.toString());
-                statement.setBoolean(index++, meta.is_ongoing);
-                setNullable(index++, meta.mode.map(mode -> mode.toString()).orElseGet(null), Types.VARCHAR, statement);
-                statement.setInt(index++, meta.owner_operator_id);
-                statement.setInt(index++, meta.vehicle_number);
-                statement.setString(index++, meta.unique_vehicle_id);
+                statement.setTimestamp(index++, Timestamp.from(Instant.ofEpochMilli(meta.getReceivedAt())));
+                statement.setString(index++, meta.getTopicPrefix());
+                statement.setString(index++, meta.getTopicVersion());
+                statement.setString(index++, meta.getJourneyType().toString());
+                statement.setBoolean(index++, meta.getTemporalType() == Hfp.Topic.TemporalType.ongoing);
 
-                setNullable(index++, meta.route_id.orElse(null), Types.VARCHAR, statement);
-                setNullable(index++, meta.direction_id.orElse(null), Types.INTEGER, statement);
-                setNullable(index++, meta.headsign.orElse(null), Types.VARCHAR, statement);
-                setNullable(index++, meta.journey_start_time.map(java.sql.Time::valueOf).orElse(null), Types.TIME, statement);
-                setNullable(index++, meta.next_stop_id.orElse(null), Types.VARCHAR, statement);
-                setNullable(index++, meta.geohash_level.orElse(null), Types.INTEGER, statement);
-                setNullable(index++, meta.topic_latitude.orElse(null), Types.DOUBLE, statement);
-                setNullable(index++, meta.topic_longitude.orElse(null), Types.DOUBLE, statement);
+                // Protobuf doesn't allow us to get an object which hasn't been set, so we always have to check of existance before.
+                // JDBC Driver doesn't support Optionals nor does it stand leaving null values unset, so we need to explicitly insert nulls also.
+                // => these cause some boilerplate here.
+
+                Optional<String> maybeMode = wrapToOptional(meta::hasTransportMode, meta::getTransportMode).map(mode -> mode.toString());
+                setNullable(index++, maybeMode.orElse(null), Types.VARCHAR, statement);
+
+                statement.setInt(index++, meta.getOperatorId());
+                statement.setInt(index++, meta.getVehicleNumber());
+                statement.setString(index++, meta.getUniqueVehicleId());
+
+                setNullable(index++, meta::hasRouteId, meta::getRouteId, Types.VARCHAR, statement);
+                setNullable(index++, meta::hasDirectionId, meta::getDirectionId, Types.INTEGER, statement);
+                setNullable(index++, meta::hasHeadsign, meta::getHeadsign, Types.VARCHAR, statement);
+
+                Optional<Time> maybeStartTime = wrapToOptional(meta::hasStartTime, meta::getStartTime).flatMap(HfpParser::safeParseTime);
+                setNullable(index++, maybeStartTime.orElse(null), Types.TIME, statement);
+                setNullable(index++, meta::hasNextStop, meta::getNextStop, Types.VARCHAR, statement);
+                setNullable(index++, meta::hasGeohashLevel, meta::getGeohashLevel, Types.INTEGER, statement);
+                setNullable(index++, meta::hasLatitude, meta::getLatitude, Types.DOUBLE, statement);
+                setNullable(index++, meta::hasLongitude, meta::getLongitude, Types.DOUBLE, statement);
 
                 //From payload:
-                final HfpMessage message = data.getPayload();
-                setNullable(index++, message.VP.desi, Types.VARCHAR, statement);
-                setNullable(index++, MessageParser.safeParseInt(message.VP.dir), Types.INTEGER, statement);
-                setNullable(index++, message.VP.oper, Types.INTEGER, statement);
+                final Hfp.Payload message = data.getPayload();
+                setNullable(index++, message::hasDesi, message::getDesi, Types.VARCHAR, statement);
 
-                statement.setInt(index++, message.VP.veh);
-                statement.setTimestamp(index++, MessageParser.safeParseTimestamp(message.VP.tst));
-                statement.setLong(index++, message.VP.tsi);
+                Optional<Integer> maybeDirection = wrapToOptional(message::hasDir, message::getDir).flatMap(HfpParser::safeParseInt);
+                setNullable(index++, maybeDirection.orElse(null), Types.INTEGER, statement);
+                setNullable(index++, message::hasOper, message::getOper, Types.INTEGER, statement);
 
-                setNullable(index++, message.VP.spd, Types.DOUBLE, statement);
-                setNullable(index++, message.VP.hdg, Types.DOUBLE, statement);
-                setNullable(index++, message.VP.lat, Types.DOUBLE, statement);
-                setNullable(index++, message.VP.longitude, Types.DOUBLE, statement);
-                setNullable(index++, message.VP.acc, Types.DOUBLE, statement);
-                setNullable(index++, message.VP.dl, Types.INTEGER, statement);
-                setNullable(index++, message.VP.odo, Types.DOUBLE, statement);
-                setNullable(index++, MessageParser.safeParseBoolean(message.VP.drst), Types.BOOLEAN, statement);
-                setNullable(index++, message.VP.oday, Types.DATE, statement);
-                setNullable(index++, message.VP.jrn, Types.INTEGER, statement);
-                setNullable(index++, message.VP.line, Types.INTEGER, statement);
-                setNullable(index++, MessageParser.safeParseTime(message.VP.start), Types.TIME, statement);
+                statement.setInt(index++, message.getVeh());
+                statement.setTimestamp(index++, HfpParser.safeParseTimestamp(message.getTst()).get()); // This field cannot be null
+                statement.setLong(index++, message.getTsi());
+
+                setNullable(index++, message::hasSpd, message::getSpd, Types.DOUBLE, statement);
+                setNullable(index++, message::hasHdg, message::getHdg, Types.DOUBLE, statement);
+                setNullable(index++, message::hasLat, message::getLat, Types.DOUBLE, statement);
+                setNullable(index++, message::hasLong, message::getLong, Types.DOUBLE, statement);
+                setNullable(index++, message::hasAcc, message::getAcc, Types.DOUBLE, statement);
+                setNullable(index++, message::hasDl, message::getDl, Types.INTEGER, statement);
+
+
+                Optional<Double> maybeOdometer = wrapToOptional(message::hasOdo, message::getOdo).map(Integer::doubleValue);
+                setNullable(index++, maybeOdometer.orElse(null), Types.DOUBLE, statement);
+                //setNullable(index++, message::hasOdo, message::getOdo, Types.DOUBLE, statement); //TODO convert Odometer to Int in SQL Schema also
+
+                Optional<Boolean> maybeDoors = wrapToOptional(message::hasDrst, message::getDrst).flatMap(HfpParser::safeParseBoolean);
+                setNullable(index++, maybeDoors.orElse(null), Types.BOOLEAN, statement);
+
+                Optional<Date> maybeOperatingDay = wrapToOptional(message::hasOday, message::getOday).flatMap(HfpParser::safeParseDate);
+                setNullable(index++, maybeOperatingDay.orElse(null), Types.DATE, statement);
+                setNullable(index++, message::hasJrn, message::getJrn, Types.INTEGER, statement);
+                setNullable(index++, message::hasLine, message::getLine, Types.INTEGER, statement);
+
+                Optional<Time> maybeStartTimePayload = wrapToOptional(message::hasStart, message::getStart).flatMap(HfpParser::safeParseTime);
+                setNullable(index++, maybeStartTimePayload.orElse(null), Types.TIME, statement);
 
                 statement.addBatch();
             }
@@ -124,6 +147,19 @@ public class QueueWriter {
             long elapsed = System.currentTimeMillis() - startTime;
             log.info("Total insert time: {} ms", elapsed);
         }
+    }
+
+    static <T> Optional<T> wrapToOptional(Supplier<Boolean> isPresent, Supplier<T> getter) {
+        if (isPresent.get()) {
+            return Optional.of(getter.get());
+        }
+        return Optional.empty();
+    }
+
+    private <T> void setNullable(int index, Supplier<Boolean> isPresent, Supplier<T> getter, int jdbcType, PreparedStatement statement) throws SQLException {
+        Optional<T> maybeValue = wrapToOptional(isPresent, getter);
+        T valueOrNull = maybeValue.orElse(null);
+        setNullable(index, valueOrNull, jdbcType, statement);
     }
 
     private void setNullable(int index, Object value, int jdbcType, PreparedStatement statement) throws SQLException {
@@ -154,4 +190,15 @@ public class QueueWriter {
         }
     }
 
+    public void close() {
+        log.info("Closing DB Connection");
+        try {
+            if (connection != null) {
+                connection.close();
+            }
+        } catch (Exception e) {
+            log.error("Failed to close DB Connection", e);
+        }
+
+    }
 }
