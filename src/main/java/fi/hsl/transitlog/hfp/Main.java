@@ -3,13 +3,8 @@ package fi.hsl.transitlog.hfp;
 import com.typesafe.config.Config;
 import fi.hsl.common.config.ConfigParser;
 import fi.hsl.common.pulsar.PulsarApplication;
-import fi.hsl.common.pulsar.PulsarApplicationContext;
-import fi.hsl.transitlog.mqtt.MqttConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.util.Scanner;
 
 public class Main {
 
@@ -22,22 +17,22 @@ public class Main {
         Config config = ConfigParser.createConfig();
 
         log.info("Configuration read, launching the main loop");
-        MqttConnector connector = null;
         MessageProcessor processor = null;
+        QueueWriter writer = null;
         try (PulsarApplication app = PulsarApplication.newInstance(config)) {
-            QueueWriter writer = QueueWriter.newInstance(config);
-            processor = MessageProcessor.newInstance(config, writer);
+            writer = QueueWriter.newInstance(config);
+            processor = MessageProcessor.newInstance(app, writer);
             log.info("Starting to process messages");
 
-            app.launchWithHandler();
+            app.launchWithHandler(processor);
         }
         catch (Exception e) {
             log.error("Exception at main", e);
             if (processor != null) {
                 processor.close(false);
             }
-            if (connector != null) {
-                connector.close();
+            if (writer != null) {
+                writer.close();
             }
         }
 

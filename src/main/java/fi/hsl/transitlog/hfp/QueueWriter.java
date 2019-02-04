@@ -190,4 +190,15 @@ public class QueueWriter {
         }
     }
 
+    public void close() {
+        log.info("Closing DB Connection");
+        try {
+            if (connection != null) {
+                connection.close();
+            }
+        } catch (Exception e) {
+            log.error("Failed to close DB Connection", e);
+        }
+
+    }
 }
