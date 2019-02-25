@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/HSLdevcom/transitlog-hfp-source.svg?branch=master)](https://travis-ci.org/HSLdevcom/transitlog-hfp-source)
+
 ## Description
 
 Application for inserting HFP data to PostgreSQL TimescaleDB.
