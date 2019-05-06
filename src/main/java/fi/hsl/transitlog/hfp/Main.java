@@ -12,7 +12,7 @@ public class Main {
 
 
     public static void main(String[] args) {
-        log.info("Launching Transitdata-HFP-Source.");
+        log.info("Launching Transitdata-HFP-Sink.");
 
         Config config = ConfigParser.createConfig();
 
