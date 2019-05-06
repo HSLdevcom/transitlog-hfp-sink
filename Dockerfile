@@ -27,6 +27,6 @@ FROM openjdk:8-jre-slim
 
 #This container can access the build artifacts inside the BUILD container.
 #Everything that is not copied is discarded
-COPY --from=BUILD /usr/src/app/target/transitlog-hfp-source-jar-with-dependencies.jar /usr/app/transitlog-hfp-source.jar
+COPY --from=BUILD /usr/src/app/target/transitlog-hfp-sink-jar-with-dependencies.jar /usr/app/transitlog-hfp-sink.jar
 
-ENTRYPOINT ["java", "-jar", "/usr/app/transitlog-hfp-source.jar"]
+ENTRYPOINT ["java", "-jar", "/usr/app/transitlog-hfp-sink.jar"]

@@ -1,7 +1,7 @@
 <project>
     <modelVersion>4.0.0</modelVersion>
     <groupId>fi.hsl.transitlog</groupId>
-    <artifactId>transitlog-hfp-source</artifactId>
+    <artifactId>transitlog-hfp-sink</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
 
@@ -42,7 +42,7 @@
     </dependencies>
 
     <build>
-        <finalName>transitlog-hfp-source</finalName>
+        <finalName>transitlog-hfp-sink</finalName>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
