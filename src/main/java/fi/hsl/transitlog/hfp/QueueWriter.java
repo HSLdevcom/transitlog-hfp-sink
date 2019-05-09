@@ -23,13 +23,9 @@ public class QueueWriter {
         connection = conn;
     }
 
-    public static QueueWriter newInstance(Config config) throws Exception {
-        final String connectionString = config.getString("db.connectionString");
-        final String user = config.getString("db.username");
-        final String password = config.getString("db.password");
-
-        log.info("Connecting to the database with connection string " + connectionString);
-        Connection conn = DriverManager.getConnection(connectionString, user, password);
+    public static QueueWriter newInstance(Config config, final String connectionString) throws Exception {
+        log.info("Connecting to the database");
+        Connection conn = DriverManager.getConnection(connectionString);
         conn.setAutoCommit(false); // we're doing batch inserts so no auto commit
         log.info("Connection success");
         return new QueueWriter(conn);
