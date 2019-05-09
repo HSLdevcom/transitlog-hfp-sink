@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.util.Optional;
 import java.util.Scanner;
 
 public class Main {
@@ -24,7 +25,7 @@ public class Main {
         MessageProcessor processor = null;
         QueueWriter writer = null;
         try (PulsarApplication app = PulsarApplication.newInstance(config)) {
-            final String connectionString = readConnectionString();
+            final String connectionString = ConfigUtils.getConnectionStringFromFileOrThrow(Optional.of("/run/secrets/db_conn_string"));
             writer = QueueWriter.newInstance(config, connectionString);
             processor = MessageProcessor.newInstance(app, writer);
             log.info("Starting to process messages");
@@ -40,25 +41,5 @@ public class Main {
                 writer.close();
             }
         }
-
-    }
-
-    private static String readConnectionString() throws Exception {
-        String connectionString = "";
-        try {
-            //Default path is what works with Docker out-of-the-box. Override with a local file if needed
-            final String secretFilePath = ConfigUtils.getEnv("FILEPATH_CONNECTION_STRING")
-                    .orElse("/run/secrets/db_conn_string");
-            connectionString = new Scanner(new File(secretFilePath))
-                    .useDelimiter("\\Z").next();
-        } catch (Exception e) {
-            log.error("Failed to read DB connection string from secrets", e);
-            throw e;
-        }
-
-        if (connectionString.isEmpty()) {
-            throw new Exception("Failed to find DB connection string, exiting application");
-        }
-        return connectionString;
     }
 }
