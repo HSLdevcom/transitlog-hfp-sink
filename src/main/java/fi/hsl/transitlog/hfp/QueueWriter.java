@@ -110,7 +110,7 @@ public class QueueWriter {
                 statement.setLong(index++, message.getTsi());
 
                 setNullable(index++, message::hasSpd, message::getSpd, Types.DOUBLE, statement);
-                setNullable(index++, message::hasHdg, message::getHdg, Types.DOUBLE, statement);
+                setNullable(index++, message::hasHdg, message::getHdg, Types.INTEGER, statement);
                 setNullable(index++, message::hasLat, message::getLat, Types.DOUBLE, statement);
                 setNullable(index++, message::hasLong, message::getLong, Types.DOUBLE, statement);
                 setNullable(index++, message::hasAcc, message::getAcc, Types.DOUBLE, statement);

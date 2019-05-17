@@ -62,7 +62,7 @@ CREATE TABLE vehicles (
     tst                TIMESTAMPTZ         NOT NULL,
     tsi                BIGINT              NOT NULL,
     spd                DOUBLE PRECISION        NULL,
-    hdg                DOUBLE PRECISION        NULL,
+    hdg                SMALLINT                NULL,
     lat                DOUBLE PRECISION        NULL,
     long               DOUBLE PRECISION        NULL,
     acc                DOUBLE PRECISION        NULL,
