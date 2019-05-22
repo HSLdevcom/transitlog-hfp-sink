@@ -70,7 +70,7 @@ CREATE TABLE vehicles (
     odo                DOUBLE PRECISION        NULL,
     drst               BOOLEAN                 NULL,
     oday               DATE                    NULL,
-    jrn                SMALLINT                NULL,
+    jrn                INTEGER                 NULL,
     line               SMALLINT                NULL,
     start              TIME                    NULL,
     loc                LOCATION_QUALITY_METHOD NULL, -- v2
