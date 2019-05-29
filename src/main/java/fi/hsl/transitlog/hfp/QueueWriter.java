@@ -106,16 +106,12 @@ public class QueueWriter {
                 statement.setLong(index++, message.getTsi());
 
                 setNullable(index++, message::hasSpd, message::getSpd, Types.DOUBLE, statement);
-                setNullable(index++, message::hasHdg, message::getHdg, Types.DOUBLE, statement);
+                setNullable(index++, message::hasHdg, message::getHdg, Types.INTEGER, statement);
                 setNullable(index++, message::hasLat, message::getLat, Types.DOUBLE, statement);
                 setNullable(index++, message::hasLong, message::getLong, Types.DOUBLE, statement);
                 setNullable(index++, message::hasAcc, message::getAcc, Types.DOUBLE, statement);
                 setNullable(index++, message::hasDl, message::getDl, Types.INTEGER, statement);
-
-
-                Optional<Double> maybeOdometer = wrapToOptional(message::hasOdo, message::getOdo).map(Integer::doubleValue);
-                setNullable(index++, maybeOdometer.orElse(null), Types.DOUBLE, statement);
-                //setNullable(index++, message::hasOdo, message::getOdo, Types.DOUBLE, statement); //TODO convert Odometer to Int in SQL Schema also
+                setNullable(index++, message::hasOdo, message::getOdo, Types.DOUBLE, statement);
 
                 Optional<Boolean> maybeDoors = wrapToOptional(message::hasDrst, message::getDrst).flatMap(HfpParser::safeParseBoolean);
                 setNullable(index++, maybeDoors.orElse(null), Types.BOOLEAN, statement);
