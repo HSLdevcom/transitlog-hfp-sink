@@ -35,7 +35,7 @@ public class QueueWriter {
         return new StringBuffer()
                 .append("INSERT INTO VEHICLES (")
                 .append("received_at, topic_prefix, topic_version, ")
-                .append("journey_type, is_ongoing, mode, ")
+                .append("journey_type, is_ongoing, event_type, mode, ")
                 .append("owner_operator_id, vehicle_number, unique_vehicle_id, ")
                 .append("route_id, direction_id, headsign, ")
                 .append("journey_start_time, next_stop_id, geohash_level, ")
@@ -45,10 +45,11 @@ public class QueueWriter {
                 .append("spd, hdg, lat, ")
                 .append("long, acc, dl, ")
                 .append("odo, drst, oday, ")
-                .append("jrn, line, start")
+                .append("jrn, line, start, ")
+                .append("loc, stop, route, occu")
                 .append(") VALUES (")
-                .append("?, ?, ?, ?::JOURNEY_TYPE, ?, ?::TRANSPORT_MODE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ")
-                .append("?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?")
+                .append("?, ?, ?, ?::JOURNEY_TYPE, ?, ?::EVENT_TYPE, ?::TRANSPORT_MODE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ")
+                .append("?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::LOCATION_QUALITY_METHOD, ?, ?, ?")
                 .append(");")
                 .toString();
     }
@@ -74,6 +75,9 @@ public class QueueWriter {
                 // Protobuf doesn't allow us to get an object which hasn't been set, so we always have to check of existance before.
                 // JDBC Driver doesn't support Optionals nor does it stand leaving null values unset, so we need to explicitly insert nulls also.
                 // => these cause some boilerplate here.
+
+                Optional<String> maybeEventType = wrapToOptional(meta::hasEventType, meta::getEventType).map(eventType -> eventType.toString());
+                setNullable(index++, maybeEventType.orElse(null), Types.VARCHAR, statement);
 
                 Optional<String> maybeMode = wrapToOptional(meta::hasTransportMode, meta::getTransportMode).map(mode -> mode.toString());
                 setNullable(index++, maybeMode.orElse(null), Types.VARCHAR, statement);
@@ -123,6 +127,12 @@ public class QueueWriter {
 
                 Optional<Time> maybeStartTimePayload = wrapToOptional(message::hasStart, message::getStart).flatMap(HfpParser::safeParseTime);
                 setNullable(index++, maybeStartTimePayload.orElse(null), Types.TIME, statement);
+
+                Optional<String> maybeLoc = wrapToOptional(message::hasLoc, message::getLoc).map(loc -> loc.toString());
+                setNullable(index++, maybeLoc.orElse(null), Types.VARCHAR, statement);
+                setNullable(index++, message::hasStop, message::getStop, Types.INTEGER, statement);
+                setNullable(index++, message::hasRoute, message::getRoute, Types.VARCHAR, statement);
+                setNullable(index++, message::hasOccu, message::getOccu, Types.INTEGER, statement);
 
                 statement.addBatch();
             }
