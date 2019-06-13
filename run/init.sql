@@ -1,32 +1,20 @@
 CREATE ROLE creator LOGIN CREATEDB CREATEROLE;
 \password creator;
 
-
-
 SET ROLE creator;
 
 CREATE ROLE hfp_writer LOGIN;
 \password hfp_writer;
 
-CREATE ROLE postgraphile LOGIN;
-\password postgraphile;
-
-CREATE ROLE hasura LOGIN;
-\password hasura;
-
 CREATE database vehicles;
 
 RESET ROLE;
-
-
 
 \c vehicles;
 
 CREATE EXTENSION IF NOT EXISTS postgis CASCADE;
 CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-
 
 SET ROLE creator;
 
@@ -95,19 +83,5 @@ CREATE INDEX oday_idx ON vehicles USING brin (oday);
 CREATE INDEX lat_idx ON vehicles (lat);
 CREATE INDEX long_idx ON vehicles (long);
 CREATE INDEX next_stop_id_idx ON vehicles (next_stop_id);
-
--- Set up Hasura.
-
-CREATE SCHEMA IF NOT EXISTS hdb_catalog;
-CREATE SCHEMA IF NOT EXISTS hdb_views;
-
-GRANT ALL PRIVILEGES ON SCHEMA hdb_catalog TO hasura;
-GRANT ALL PRIVILEGES ON SCHEMA hdb_views TO hasura;
-
-GRANT SELECT ON ALL TABLES IN SCHEMA information_schema TO hasura;
-GRANT SELECT ON ALL TABLES IN SCHEMA pg_catalog TO hasura;
-
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO hasura;
-GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO hasura;
 
 RESET ROLE;
