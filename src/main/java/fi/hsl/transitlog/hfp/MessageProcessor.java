@@ -89,8 +89,12 @@ public class MessageProcessor implements IMessageHandler {
 
         if (TransitdataSchema.hasProtobufSchema(message, TransitdataProperties.ProtobufSchema.HfpData)) {
             Hfp.Data data = Hfp.Data.parseFrom(message.getData());
-            synchronized (queue) {
-                queue.add(data);
+
+            //Ignore event types other than VP until transitlog has support for other event types
+            if (data.getTopic().getEventType() == Hfp.Topic.EventType.VP) {
+                synchronized (queue) {
+                    queue.add(data);
+                }
             }
         }
         else {
