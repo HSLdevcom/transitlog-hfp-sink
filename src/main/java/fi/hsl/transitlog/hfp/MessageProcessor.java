@@ -23,8 +23,6 @@ public class MessageProcessor implements IMessageHandler {
     private static final Logger log = LoggerFactory.getLogger(MessageProcessor.class);
 
     final ArrayList<Hfp.Data> queue;
-    final ArrayList<MessageId> messageIds;
-    private ArrayList<MessageId> messageIdsCopy;
     final int QUEUE_MAX_SIZE = 100000;
     final QueueWriter writer;
     private final Consumer<byte[]> consumer;
@@ -34,7 +32,6 @@ public class MessageProcessor implements IMessageHandler {
 
     private MessageProcessor(PulsarApplication app, QueueWriter w) {
         queue = new ArrayList<>(QUEUE_MAX_SIZE);
-        messageIds = new ArrayList<>(QUEUE_MAX_SIZE);
         writer = w;
         consumer = app.getContext().getConsumer();
         application = app;
@@ -67,26 +64,19 @@ public class MessageProcessor implements IMessageHandler {
 
     private void dump() throws Exception {
         log.debug("Saving results");
-        long startTime = System.currentTimeMillis();
         ArrayList<Hfp.Data> copy;
         synchronized (queue) {
             copy = new ArrayList<>(queue);
             queue.clear();
-
-            if (copy.isEmpty()) {
-                log.info("Queue empty, no messages to write to database");
-            }
-            else {
-                log.info("Writing {} messages to database", copy.size());
-                writer.write(copy);
-                messageIdsCopy = new ArrayList<>(messageIds);
-                log.info("Acknowledging {} Pulsar messages", messageIdsCopy.size());
-                messageIdsCopy.stream().forEach(messageId -> ack(messageId));
-                messageIds.clear();
-            }
         }
-        long elapsed = System.currentTimeMillis() - startTime;
-        log.info("Total processing time: {} ms", elapsed);
+
+        if (copy.isEmpty()) {
+            log.info("Queue empty, no messages to write to database");
+        }
+        else {
+            log.info("Writing {} messages to database", copy.size());
+            writer.write(copy);
+        }
     }
 
     @Override
@@ -104,13 +94,13 @@ public class MessageProcessor implements IMessageHandler {
             if (data.getTopic().getEventType() == Hfp.Topic.EventType.VP) {
                 synchronized (queue) {
                     queue.add(data);
-                    messageIds.add(message.getMessageId());
                 }
             }
         }
         else {
             log.warn("Invalid protobuf schema, expecting HfpData");
         }
+        ack(message.getMessageId());
     }
 
     private void ack(MessageId received) {
