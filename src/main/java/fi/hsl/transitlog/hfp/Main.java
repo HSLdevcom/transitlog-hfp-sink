@@ -13,6 +13,8 @@ public class Main {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) {
+        System.setProperty("DEBUG.MONGO", "true");
+        System.setProperty("DB.TRACE", "true");
         log.info("Launching Transitdata-HFP-Sink.");
 
         Config config = ConfigParser.createConfig();

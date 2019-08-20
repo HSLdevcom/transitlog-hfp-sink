@@ -75,7 +75,8 @@ public class MessageProcessor implements IMessageHandler {
         }
         else {
             log.info("Writing {} messages to database", copy.size());
-            writer.write(copy);
+            //writer.write(copy);
+            writer.writeToMongoDB(copy);
         }
     }
 

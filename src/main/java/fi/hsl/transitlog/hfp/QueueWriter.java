@@ -1,16 +1,28 @@
 package fi.hsl.transitlog.hfp;
 
+import com.mongodb.MongoClient;
+import com.mongodb.MongoClientOptions;
+import com.mongodb.MongoClientURI;
+import com.mongodb.ServerAddress;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
 import com.typesafe.config.Config;
 import fi.hsl.common.hfp.HfpParser;
 import fi.hsl.common.hfp.proto.Hfp;
+import fi.hsl.transitlog.hfp.models.HFP;
+import org.bson.codecs.configuration.CodecRegistry;
+import org.bson.codecs.pojo.PojoCodecProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
+import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 import java.sql.*;
-import java.time.Instant;
+import java.time.*;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static java.sql.Types.*;
 
@@ -19,16 +31,26 @@ public class QueueWriter {
 
     Connection connection;
 
+    CodecRegistry pojoCodecRegistry = fromRegistries(MongoClient.getDefaultCodecRegistry(),
+            fromProviders(PojoCodecProvider.builder().automatic(true).build()));
+
+    MongoClient mongoClient = new MongoClient(new MongoClientURI("mongodb://transitlog-hfp:aYNr04xGXLbuky8B1gmhTiZUcp23HhOlrGrLoVTaxQjALAZbTDxiH6xzC0c0XOciqmlYATCJek1LYPvMxtpayw==@transitlog-hfp.documents.azure.com:10255/?ssl=true&replicaSet=globaldb"));
+    MongoDatabase database = mongoClient.getDatabase("transitlog-hfp").withCodecRegistry(pojoCodecRegistry);
+    MongoCollection<HFP> collection = database.getCollection("vehicles", HFP.class);
+
+    private QueueWriter() {};
+
     private QueueWriter(Connection conn) {
         connection = conn;
     }
 
     public static QueueWriter newInstance(Config config, final String connectionString) throws Exception {
         log.info("Connecting to the database");
-        Connection conn = DriverManager.getConnection(connectionString);
-        conn.setAutoCommit(false); // we're doing batch inserts so no auto commit
+        //Connection conn = DriverManager.getConnection(connectionString);
+        //conn.setAutoCommit(false); // we're doing batch inserts so no auto commit
         log.info("Connection success");
-        return new QueueWriter(conn);
+        //return new QueueWriter(conn);
+        return new QueueWriter();
     }
 
     private String createInsertStatement() {
@@ -52,6 +74,61 @@ public class QueueWriter {
                 .append("?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::LOCATION_QUALITY_METHOD, ?, ?, ?")
                 .append(");")
                 .toString();
+    }
+
+    public HFP createHfp(Hfp.Data data) {
+        HFP hfp = new HFP();
+        final Hfp.Topic meta = data.getTopic();
+        hfp.received_at = ZonedDateTime.ofInstant(Instant.ofEpochSecond(meta.getReceivedAt()), ZoneOffset.UTC);
+        hfp.topic_prefix = meta.getTopicPrefix();
+        hfp.topic_version = meta.getTopicVersion();
+        hfp.journey_type = meta.getJourneyType().toString();
+        hfp.is_ongoing = meta.getTemporalType() == Hfp.Topic.TemporalType.ongoing;
+        hfp.event_type = wrapToOptional(meta::hasEventType, meta::getEventType).map(eventType -> eventType.toString()).orElse(null);
+        hfp.mode = wrapToOptional(meta::hasTransportMode, meta::getTransportMode).map(mode -> mode.toString()).orElse(null);
+        hfp.owner_operator_id = meta.getOperatorId();
+        hfp.vehicle_number = meta.getVehicleNumber();
+        hfp.unique_vehicle_id = meta.getUniqueVehicleId();
+        hfp.route_id = meta.getRouteId();
+        hfp.direction_id = meta.getDirectionId();
+        hfp.headsign = meta.getHeadsign();
+        hfp.journey_start_time = wrapToOptional(meta::hasStartTime, meta::getStartTime).map(startTime -> LocalTime.parse(startTime)).orElse(null);
+        hfp.next_stop_id = meta.getNextStop();
+        hfp.geohash_level = meta.getGeohashLevel();
+        hfp.topic_latitude = meta.getLatitude();
+        hfp.topic_longitude = meta.getLongitude();
+        //From payload:
+        final Hfp.Payload message = data.getPayload();
+        hfp.desi = message.getDesi();
+        hfp.dir = wrapToOptional(message::hasDir, message::getDir).flatMap(HfpParser::safeParseInt).orElse(null);
+        hfp.oper = message.getOper();
+        hfp.veh = message.getVeh();
+        hfp.tst = ZonedDateTime.parse(message.getTst());
+        hfp.tsi = message.getTsi();
+        hfp.spd = message.getSpd();
+        hfp.hdg = message.getHdg();
+        hfp.lat = message.getLat();
+        hfp.setLong(message.getLong());
+        hfp.acc = message.getAcc();
+        hfp.dl = message.getDl();
+        hfp.odo = message.getOdo();
+        hfp.drst = wrapToOptional(message::hasDrst, message::getDrst).flatMap(HfpParser::safeParseBoolean).orElse(null);
+        hfp.oday = wrapToOptional(message::hasOday, message::getOday).map(oday -> LocalDate.parse(oday)).orElse(null);
+        hfp.jrn = message.getJrn();
+        hfp.line = message.getLine();
+        hfp.start = wrapToOptional(message::hasStart, message::getStart).map(start -> LocalTime.parse(start)).orElse(null);
+        hfp.loc = wrapToOptional(message::hasLoc, message::getLoc).map(loc -> loc.toString()).orElse(null);
+        hfp.stop = message.getStop();
+        hfp.route = message.getRoute();
+        hfp.occu = message.getOccu();
+        return hfp;
+    }
+
+    public void writeToMongoDB(List<Hfp.Data> messages) {
+        messages.forEach(message -> {
+            HFP hfp = createHfp(message);
+            collection.insertOne(hfp);
+        });
     }
 
     public void write(List<Hfp.Data> messages) throws Exception {
