@@ -27,11 +27,10 @@
             <version>${common.version}</version>
         </dependency>
 
-        <!-- https://mvnrepository.com/artifact/org.mongodb/mongo-java-driver -->
         <dependency>
             <groupId>org.mongodb</groupId>
-            <artifactId>mongo-java-driver</artifactId>
-            <version>3.11.0</version>
+            <artifactId>mongodb-driver-reactivestreams</artifactId>
+            <version>1.12.0</version>
         </dependency>
 
         <dependency>

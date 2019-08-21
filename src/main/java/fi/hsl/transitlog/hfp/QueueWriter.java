@@ -1,21 +1,17 @@
 package fi.hsl.transitlog.hfp;
 
-import com.mongodb.MongoClient;
-import com.mongodb.MongoClientOptions;
-import com.mongodb.MongoClientURI;
-import com.mongodb.ServerAddress;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
+import com.mongodb.ConnectionString;
+import com.mongodb.client.model.InsertOneModel;
+import com.mongodb.client.model.WriteModel;
+import com.mongodb.reactivestreams.client.*;
 import com.typesafe.config.Config;
 import fi.hsl.common.hfp.HfpParser;
 import fi.hsl.common.hfp.proto.Hfp;
 import fi.hsl.transitlog.hfp.models.HFP;
-import org.bson.codecs.configuration.CodecRegistry;
-import org.bson.codecs.pojo.PojoCodecProvider;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
-import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 import java.sql.*;
 import java.time.*;
@@ -24,21 +20,16 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import static java.sql.Types.*;
-
 public class QueueWriter {
     private static final Logger log = LoggerFactory.getLogger(QueueWriter.class);
 
     Connection connection;
 
-    CodecRegistry pojoCodecRegistry = fromRegistries(MongoClient.getDefaultCodecRegistry(),
-            fromProviders(PojoCodecProvider.builder().automatic(true).build()));
+    MongoClient mongoClient = MongoClients.create(new ConnectionString("mongodb://transitlog-hfp:aYNr04xGXLbuky8B1gmhTiZUcp23HhOlrGrLoVTaxQjALAZbTDxiH6xzC0c0XOciqmlYATCJek1LYPvMxtpayw==@transitlog-hfp.documents.azure.com:10255/?ssl=true&replicaSet=globaldb"));
+    MongoDatabase mongoDatabase = mongoClient.getDatabase("hsl");
 
-    MongoClient mongoClient = new MongoClient(new MongoClientURI("mongodb://transitlog-hfp:aYNr04xGXLbuky8B1gmhTiZUcp23HhOlrGrLoVTaxQjALAZbTDxiH6xzC0c0XOciqmlYATCJek1LYPvMxtpayw==@transitlog-hfp.documents.azure.com:10255/?ssl=true&replicaSet=globaldb"));
-    MongoDatabase database = mongoClient.getDatabase("transitlog-hfp").withCodecRegistry(pojoCodecRegistry);
-    MongoCollection<HFP> collection = database.getCollection("vehicles", HFP.class);
-
-    private QueueWriter() {};
+    private QueueWriter() {
+    }
 
     private QueueWriter(Connection conn) {
         connection = conn;
@@ -53,27 +44,31 @@ public class QueueWriter {
         return new QueueWriter();
     }
 
-    private String createInsertStatement() {
-        return new StringBuffer()
-                .append("INSERT INTO VEHICLES (")
-                .append("received_at, topic_prefix, topic_version, ")
-                .append("journey_type, is_ongoing, event_type, mode, ")
-                .append("owner_operator_id, vehicle_number, unique_vehicle_id, ")
-                .append("route_id, direction_id, headsign, ")
-                .append("journey_start_time, next_stop_id, geohash_level, ")
-                .append("topic_latitude, topic_longitude, ")
-                .append("desi, dir, oper, ")
-                .append("veh, tst, tsi, ")
-                .append("spd, hdg, lat, ")
-                .append("long, acc, dl, ")
-                .append("odo, drst, oday, ")
-                .append("jrn, line, start, ")
-                .append("loc, stop, route, occu")
-                .append(") VALUES (")
-                .append("?, ?, ?, ?::JOURNEY_TYPE, ?, ?::EVENT_TYPE, ?::TRANSPORT_MODE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ")
-                .append("?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::LOCATION_QUALITY_METHOD, ?, ?, ?")
-                .append(");")
-                .toString();
+    public void writeToMongoDB(List<Hfp.Data> messages) {
+        MongoCollection<HFP> vehicles = mongoDatabase.getCollection("vehicles", HFP.class);
+        List<HFP> collect = messages.stream()
+                .map(this::createHfp)
+                .collect(Collectors.toList());
+        vehicles.insertMany(collect).subscribe(new Subscriber<Success>() {
+            @Override
+            public void onSubscribe(Subscription subscription) {
+            }
+
+            @Override
+            public void onNext(Success success) {
+
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                log.error("Error while inserting rows to mongo", throwable);
+            }
+
+            @Override
+            public void onComplete() {
+                log.info("Inserted {} rows to mongo", messages.size());
+            }
+        });
     }
 
     public HFP createHfp(Hfp.Data data) {
@@ -124,11 +119,16 @@ public class QueueWriter {
         return hfp;
     }
 
-    public void writeToMongoDB(List<Hfp.Data> messages) {
-        messages.forEach(message -> {
-            HFP hfp = createHfp(message);
-            collection.insertOne(hfp);
-        });
+    static <T> Optional<T> wrapToOptional(Supplier<Boolean> isPresent, Supplier<T> getter) {
+        if (isPresent.get()) {
+            return Optional.of(getter.get());
+        }
+        return Optional.empty();
+    }
+
+    private WriteModel<HFP> mapToWriteModel(Hfp.Data data) {
+        HFP hfp = createHfp(data);
+        return new InsertOneModel<>(hfp);
     }
 
     public void write(List<Hfp.Data> messages) throws Exception {
@@ -138,7 +138,7 @@ public class QueueWriter {
         String queryString = createInsertStatement();
         try (PreparedStatement statement = connection.prepareStatement(queryString)) {
 
-            for (Hfp.Data data: messages) {
+            for (Hfp.Data data : messages) {
                 int index = 1;
 
                 final Hfp.Topic meta = data.getTopic();
@@ -216,23 +216,37 @@ public class QueueWriter {
 
             statement.executeBatch();
             connection.commit();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             log.error("Failed to insert batch to database: ", e);
             connection.rollback();
             throw e;
-        }
-        finally {
+        } finally {
             long elapsed = System.currentTimeMillis() - startTime;
             log.info("Total insert time: {} ms", elapsed);
         }
     }
 
-    static <T> Optional<T> wrapToOptional(Supplier<Boolean> isPresent, Supplier<T> getter) {
-        if (isPresent.get()) {
-            return Optional.of(getter.get());
-        }
-        return Optional.empty();
+    private String createInsertStatement() {
+        return new StringBuffer()
+                .append("INSERT INTO VEHICLES (")
+                .append("received_at, topic_prefix, topic_version, ")
+                .append("journey_type, is_ongoing, event_type, mode, ")
+                .append("owner_operator_id, vehicle_number, unique_vehicle_id, ")
+                .append("route_id, direction_id, headsign, ")
+                .append("journey_start_time, next_stop_id, geohash_level, ")
+                .append("topic_latitude, topic_longitude, ")
+                .append("desi, dir, oper, ")
+                .append("veh, tst, tsi, ")
+                .append("spd, hdg, lat, ")
+                .append("long, acc, dl, ")
+                .append("odo, drst, oday, ")
+                .append("jrn, line, start, ")
+                .append("loc, stop, route, occu")
+                .append(") VALUES (")
+                .append("?, ?, ?, ?::JOURNEY_TYPE, ?, ?::EVENT_TYPE, ?::TRANSPORT_MODE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ")
+                .append("?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::LOCATION_QUALITY_METHOD, ?, ?, ?")
+                .append(");")
+                .toString();
     }
 
     private <T> void setNullable(int index, Supplier<Boolean> isPresent, Supplier<T> getter, int jdbcType, PreparedStatement statement) throws SQLException {
@@ -244,26 +258,33 @@ public class QueueWriter {
     private void setNullable(int index, Object value, int jdbcType, PreparedStatement statement) throws SQLException {
         if (value == null) {
             statement.setNull(index, jdbcType);
-        }
-        else {
+        } else {
             //This is just awful but Postgres driver does not support setObject(value, type);
             //Leaving null values not set is also not an option.
             switch (jdbcType) {
-                case Types.BOOLEAN: statement.setBoolean(index, (Boolean)value);
+                case Types.BOOLEAN:
+                    statement.setBoolean(index, (Boolean) value);
                     break;
-                case Types.INTEGER: statement.setInt(index, (Integer) value);
+                case Types.INTEGER:
+                    statement.setInt(index, (Integer) value);
                     break;
-                case Types.BIGINT: statement.setLong(index, (Long)value);
+                case Types.BIGINT:
+                    statement.setLong(index, (Long) value);
                     break;
-                case Types.DOUBLE: statement.setDouble(index, (Double) value);
+                case Types.DOUBLE:
+                    statement.setDouble(index, (Double) value);
                     break;
-                case Types.DATE: statement.setDate(index, (Date)value);
+                case Types.DATE:
+                    statement.setDate(index, (Date) value);
                     break;
-                case Types.TIME: statement.setTime(index, (Time)value);
+                case Types.TIME:
+                    statement.setTime(index, (Time) value);
                     break;
-                case Types.VARCHAR: statement.setString(index, (String)value); //Not sure if this is correct, field in schema is TEXT
+                case Types.VARCHAR:
+                    statement.setString(index, (String) value); //Not sure if this is correct, field in schema is TEXT
                     break;
-                default: log.error("Invalid jdbc type, bug in the app! {}", jdbcType);
+                default:
+                    log.error("Invalid jdbc type, bug in the app! {}", jdbcType);
                     break;
             }
         }
