@@ -54,8 +54,7 @@ public class MessageProcessor implements IMessageHandler {
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 dump();
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 log.error("Failed to check results, closing application", e);
                 close(true);
             }
@@ -72,8 +71,7 @@ public class MessageProcessor implements IMessageHandler {
 
         if (copy.isEmpty()) {
             log.info("Queue empty, no messages to write to database");
-        }
-        else {
+        } else {
             log.info("Writing {} messages to database", copy.size());
             writer.write(copy);
         }
@@ -91,13 +89,10 @@ public class MessageProcessor implements IMessageHandler {
             Hfp.Data data = Hfp.Data.parseFrom(message.getData());
 
             //Ignore event types other than VP until transitlog has support for other event types
-            if (data.getTopic().getEventType() == Hfp.Topic.EventType.VP) {
-                synchronized (queue) {
-                    queue.add(data);
-                }
+            synchronized (queue) {
+                queue.add(data);
             }
-        }
-        else {
+        } else {
             log.warn("Invalid protobuf schema, expecting HfpData");
         }
         ack(message.getMessageId());
