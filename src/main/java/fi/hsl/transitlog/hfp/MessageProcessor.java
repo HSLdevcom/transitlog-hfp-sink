@@ -24,6 +24,7 @@ public class MessageProcessor implements IMessageHandler {
 
     final ArrayList<Hfp.Data> queue;
     final int QUEUE_MAX_SIZE = 100000;
+    private boolean queueFull = false;
     final QueueWriter writer;
     private final Consumer<byte[]> consumer;
     private final PulsarApplication application;
@@ -79,10 +80,16 @@ public class MessageProcessor implements IMessageHandler {
 
     @Override
     public void handleMessage(Message message) throws Exception {
-        if (queue.size() > QUEUE_MAX_SIZE) {
-            //TODO think what to do if queue is full!
-            log.error("Queue full: " + QUEUE_MAX_SIZE);
+        if (queue.size() >= QUEUE_MAX_SIZE) {
+            //TODO think what to do if queue is full (other than manually reset pulsar cursor to read from message backlog)!
+            if (Boolean.FALSE.equals(queueFull)) {
+                log.error("Queue got full: " + QUEUE_MAX_SIZE);
+                queueFull = true;
+            }
             return;
+        } else {
+            if (Boolean.TRUE.equals(queueFull)) { log.error("Queue not full anymore: " + queue.size()); }
+            queueFull = false;
         }
 
         if (TransitdataSchema.hasProtobufSchema(message, TransitdataProperties.ProtobufSchema.HfpData)) {
