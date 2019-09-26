@@ -48,7 +48,7 @@ public class MessageProcessor implements IMessageHandler {
     }
 
     void startDumpExecutor(long intervalInMs) {
-        log.info("Dump interval {} seconds", intervalInMs);
+        log.info("Dump interval {} seconds", intervalInMs/1000);
         scheduler = Executors.newSingleThreadScheduledExecutor();
         log.info("Starting result-scheduler");
 
@@ -73,7 +73,6 @@ public class MessageProcessor implements IMessageHandler {
         if (copy.isEmpty()) {
             log.info("Queue empty, no messages to write to database");
         } else {
-            log.info("Writing {} messages to database", copy.size());
             writer.write(copy);
         }
     }
