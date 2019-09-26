@@ -24,7 +24,7 @@ public class MessageProcessor implements IMessageHandler {
     private static final Logger log = LoggerFactory.getLogger(MessageProcessor.class);
 
     final ArrayList<Hfp.Data> queue;
-    final int QUEUE_MAX_SIZE = 100000;
+    final int QUEUE_MAX_SIZE = 1000000;
     private boolean queueFull = false;
     private long queueClearTime;
     final QueueWriter writer;
