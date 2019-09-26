@@ -13,8 +13,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-import static java.sql.Types.*;
-
 public class QueueWriter {
     private static final Logger log = LoggerFactory.getLogger(QueueWriter.class);
 
@@ -56,7 +54,7 @@ public class QueueWriter {
                 .toString();
     }
 
-    public void write(List<Hfp.Data> messages, long startTime) throws Exception {
+    public boolean write(List<Hfp.Data> messages, long startTime) throws Exception {
         int toWriteCount = messages.size();
 
         String queryString = createInsertStatement();
@@ -149,7 +147,8 @@ public class QueueWriter {
         finally {
             double elapsed = (System.currentTimeMillis() - startTime) / 1000.0;
             double writeSpeed = toWriteCount / elapsed;
-            log.info("Total insert time: {} s, speed: {} rows/s, start time: {}", df.format(elapsed), df.format(writeSpeed), startTime);
+            log.info("Total insert time: {} s, rate: {} rows/s, start time: {}", df.format(elapsed), df.format(writeSpeed), startTime);
+            return true;
         }
     }
 

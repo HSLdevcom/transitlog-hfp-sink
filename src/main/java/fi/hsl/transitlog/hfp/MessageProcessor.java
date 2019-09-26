@@ -4,7 +4,6 @@ import fi.hsl.common.hfp.proto.Hfp;
 import fi.hsl.common.pulsar.IMessageHandler;
 
 import fi.hsl.common.pulsar.PulsarApplication;
-import fi.hsl.common.pulsar.PulsarApplicationContext;
 import fi.hsl.common.transitdata.TransitdataProperties;
 import fi.hsl.common.transitdata.TransitdataSchema;
 import org.apache.pulsar.client.api.Consumer;
@@ -14,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.DecimalFormat;
+import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -24,6 +24,7 @@ public class MessageProcessor implements IMessageHandler {
     private static final Logger log = LoggerFactory.getLogger(MessageProcessor.class);
 
     final ArrayList<Hfp.Data> queue;
+    final ArrayList<MessageId> msgQueue;
     final int QUEUE_MAX_SIZE = 1000000;
     private boolean queueFull = false;
     private long queueClearTime;
@@ -36,6 +37,7 @@ public class MessageProcessor implements IMessageHandler {
 
     private MessageProcessor(PulsarApplication app, QueueWriter w) {
         queue = new ArrayList<>(QUEUE_MAX_SIZE);
+        msgQueue = new ArrayList<>(QUEUE_MAX_SIZE);
         queueClearTime = System.currentTimeMillis();
         writer = w;
         consumer = app.getContext().getConsumer();
@@ -69,9 +71,12 @@ public class MessageProcessor implements IMessageHandler {
     private void dump() throws Exception {
         log.debug("Saving results");
         ArrayList<Hfp.Data> copy;
+        ArrayList<MessageId> msgQueueCopy;
         synchronized (queue) {
             copy = new ArrayList<>(queue);
+            msgQueueCopy = new ArrayList<>(msgQueue);
             queue.clear();
+            msgQueue.clear();
         }
         long toWriteCount = copy.size();
         if (toWriteCount > 0) {
@@ -80,7 +85,12 @@ public class MessageProcessor implements IMessageHandler {
             queueClearTime = System.currentTimeMillis();
             double msgRateIn = (queueTtlTime > 0) ? toWriteCount / (queueTtlTime / 1000.0) : 999999.9;
             log.info("Writing {} rows to database, msgRateIn was: {} msg/s, start time: {}", toWriteCount, df.format(msgRateIn), writeStartTime);
-            writer.write(copy, writeStartTime);
+            boolean writeSuccess = writer.write(copy, writeStartTime);
+            if (writeSuccess == true) {
+                ackDeliveredMessages(msgQueueCopy);
+            } else {
+                log.error("Error in writing {} rows to db, start time: {}", copy.size(), writeStartTime);
+            }
         } else {
             log.info("Queue empty, no messages to write to database");
         }
@@ -105,11 +115,18 @@ public class MessageProcessor implements IMessageHandler {
 
             synchronized (queue) {
                 queue.add(data);
+                msgQueue.add(message.getMessageId());
             }
         } else {
             log.warn("Invalid protobuf schema, expecting HfpData");
         }
-        ack(message.getMessageId());
+        // Messages should not be acked already here but only after successful write
+    }
+
+    private void ackDeliveredMessages(List<MessageId> messageIds) {
+        for (MessageId msgId: messageIds) {
+            ack(msgId);
+        }
     }
 
     private void ack(MessageId received) {
