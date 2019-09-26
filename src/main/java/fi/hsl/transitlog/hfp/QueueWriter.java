@@ -23,6 +23,7 @@ public class QueueWriter {
     private QueueWriter(Connection conn) {
         connection = conn;
     }
+    private DecimalFormat df = new DecimalFormat("###.##");
 
     public static QueueWriter newInstance(Config config, final String connectionString) throws Exception {
         log.info("Connecting to the database");
@@ -55,11 +56,8 @@ public class QueueWriter {
                 .toString();
     }
 
-    public void write(List<Hfp.Data> messages) throws Exception {
-        long startTime = System.currentTimeMillis();
+    public void write(List<Hfp.Data> messages, long startTime) throws Exception {
         int toWriteCount = messages.size();
-
-        log.info("Writing {} rows to database, start time: {}", toWriteCount, startTime);
 
         String queryString = createInsertStatement();
         try (PreparedStatement statement = connection.prepareStatement(queryString)) {
@@ -149,10 +147,9 @@ public class QueueWriter {
             throw e;
         }
         finally {
-            DecimalFormat df = new DecimalFormat("###.##");
-            long elapsed = (System.currentTimeMillis() - startTime) / 1000;
-            long writeSpeed = toWriteCount / elapsed;
-            log.info("Total insert time: {} s, speed: {} msg/s, start time: {}", df.format(elapsed), df.format(writeSpeed), startTime);
+            double elapsed = (System.currentTimeMillis() - startTime) / 1000.0;
+            double writeSpeed = toWriteCount / elapsed;
+            log.info("Total insert time: {} s, speed: {} rows/s, start time: {}", df.format(elapsed), df.format(writeSpeed), startTime);
         }
     }
 

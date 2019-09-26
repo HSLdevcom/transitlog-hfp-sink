@@ -13,6 +13,7 @@ import org.apache.pulsar.client.api.MessageId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,14 +26,17 @@ public class MessageProcessor implements IMessageHandler {
     final ArrayList<Hfp.Data> queue;
     final int QUEUE_MAX_SIZE = 100000;
     private boolean queueFull = false;
+    private long queueClearTime;
     final QueueWriter writer;
     private final Consumer<byte[]> consumer;
     private final PulsarApplication application;
+    private DecimalFormat df = new DecimalFormat("###.##");
 
     ScheduledExecutorService scheduler;
 
     private MessageProcessor(PulsarApplication app, QueueWriter w) {
         queue = new ArrayList<>(QUEUE_MAX_SIZE);
+        queueClearTime = System.currentTimeMillis();
         writer = w;
         consumer = app.getContext().getConsumer();
         application = app;
@@ -69,25 +73,30 @@ public class MessageProcessor implements IMessageHandler {
             copy = new ArrayList<>(queue);
             queue.clear();
         }
-
-        if (copy.isEmpty()) {
-            log.info("Queue empty, no messages to write to database");
+        long toWriteCount = copy.size();
+        if (toWriteCount > 0) {
+            long writeStartTime = System.currentTimeMillis();
+            double queueTtlTime = writeStartTime - queueClearTime;
+            queueClearTime = System.currentTimeMillis();
+            double msgRateIn = (queueTtlTime > 0) ? toWriteCount / (queueTtlTime / 1000.0) : 999999.9;
+            log.info("Writing {} rows to database, msgRateIn was: {} msg/s, start time: {}", toWriteCount, df.format(msgRateIn), writeStartTime);
+            writer.write(copy, writeStartTime);
         } else {
-            writer.write(copy);
+            log.info("Queue empty, no messages to write to database");
         }
     }
 
     @Override
     public void handleMessage(Message message) throws Exception {
         if (queue.size() >= QUEUE_MAX_SIZE) {
-            //TODO think what to do if queue is full (other than manually reset pulsar cursor to read from message backlog)!
+            //TODO think what to do if queue is full (other than manually reset Pulsar cursor to read from message backlog)!
             if (Boolean.FALSE.equals(queueFull)) {
-                log.error("Queue got full: " + QUEUE_MAX_SIZE);
+                log.error("Queue got full. Storing messages to Pulsar backlog from now on, manually re-subscribe these later with Pulsar-admin");
                 queueFull = true;
             }
             return;
         } else {
-            if (Boolean.TRUE.equals(queueFull)) { log.error("Queue not full anymore: " + queue.size()); }
+            if (Boolean.TRUE.equals(queueFull)) { log.info("Queue not full anymore, size: " + queue.size()); }
             queueFull = false;
         }
 
