@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.*;
+import java.text.DecimalFormat;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -22,6 +23,7 @@ public class QueueWriter {
     private QueueWriter(Connection conn) {
         connection = conn;
     }
+    private DecimalFormat df = new DecimalFormat("###.##");
 
     public static QueueWriter newInstance(Config config, final String connectionString) throws Exception {
         log.info("Connecting to the database");
@@ -54,10 +56,9 @@ public class QueueWriter {
                 .toString();
     }
 
-    public void write(List<Hfp.Data> messages) throws Exception {
-        log.info("Writing {} rows to database", messages.size());
+    public void write(List<Hfp.Data> messages, long startTime) throws Exception {
+        int toWriteCount = messages.size();
 
-        long startTime = System.currentTimeMillis();
         String queryString = createInsertStatement();
         try (PreparedStatement statement = connection.prepareStatement(queryString)) {
 
@@ -146,8 +147,9 @@ public class QueueWriter {
             throw e;
         }
         finally {
-            long elapsed = System.currentTimeMillis() - startTime;
-            log.info("Total insert time: {} ms", elapsed);
+            double elapsed = (System.currentTimeMillis() - startTime) / 1000.0;
+            double writeSpeed = toWriteCount / elapsed;
+            log.info("Total insert time: {} s, speed: {} rows/s, start time: {}", df.format(elapsed), df.format(writeSpeed), startTime);
         }
     }
 
