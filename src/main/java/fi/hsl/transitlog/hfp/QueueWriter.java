@@ -17,9 +17,11 @@ public class QueueWriter {
     private static final Logger log = LoggerFactory.getLogger(QueueWriter.class);
 
     Connection connection;
+    int subsequentWriteFailCount;
 
     private QueueWriter(Connection conn) {
         connection = conn;
+        subsequentWriteFailCount = 0;
     }
     private DecimalFormat df = new DecimalFormat("###.##");
 
@@ -56,6 +58,7 @@ public class QueueWriter {
 
     public boolean write(List<Hfp.Data> messages, long startTime) throws Exception {
         int toWriteCount = messages.size();
+        boolean writeSuccess = false;
 
         String queryString = createInsertStatement();
         try (PreparedStatement statement = connection.prepareStatement(queryString)) {
@@ -138,17 +141,28 @@ public class QueueWriter {
 
             statement.executeBatch();
             connection.commit();
+            writeSuccess = true;
         }
         catch (Exception e) {
+            writeSuccess = false;
             log.error("Failed to insert batch to database: ", e);
             connection.rollback();
             throw e;
         }
         finally {
             double elapsed = (System.currentTimeMillis() - startTime) / 1000.0;
-            double writeSpeed = toWriteCount / elapsed;
-            log.info("Total insert time: {} s, rate: {} rows/s, start time: {}", df.format(elapsed), df.format(writeSpeed), startTime);
-            return true;
+            double writeSpeed = elapsed > 0 ? toWriteCount / elapsed : 999999.9;
+            if (writeSuccess == true) {
+                subsequentWriteFailCount = 0;
+                log.info("Total insert time: {} s, rate: {} rows/s, start time: {}", df.format(elapsed), df.format(writeSpeed), startTime);
+            } else {
+                subsequentWriteFailCount++;
+                log.error("Failed to insert in: {} s, rate: {} rows/s, start time: {}, subsequent fails (count): {}", df.format(elapsed), df.format(writeSpeed), startTime, subsequentWriteFailCount);
+                if (subsequentWriteFailCount > 9) {
+                    throw new Exception ("Failed to insert 10 times subsequently.");
+                }
+            }
+            return writeSuccess;
         }
     }
 
