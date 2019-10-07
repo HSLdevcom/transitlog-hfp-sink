@@ -25,7 +25,7 @@ public class MessageProcessor implements IMessageHandler {
 
     final ArrayList<Hfp.Data> queue;
     final ArrayList<MessageId> msgQueue;
-    final int QUEUE_MAX_SIZE = 1000000;
+    final int QUEUE_MAX_SIZE = 250000;
     private boolean queueFull = false;
     private long queueClearTime;
     final QueueWriter writer;
