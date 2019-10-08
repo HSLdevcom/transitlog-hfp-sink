@@ -32,4 +32,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl
 #Everything that is not copied is discarded
 COPY --from=BUILD /usr/src/app/target/transitlog-hfp-sink-jar-with-dependencies.jar /usr/app/transitlog-hfp-sink.jar
 
-ENTRYPOINT ["java", "-jar", "/usr/app/transitlog-hfp-sink.jar"]
+ENTRYPOINT ["java", "-Xms256m", "-Xmx4096m", "-jar", "/usr/app/transitlog-hfp-sink.jar"]
