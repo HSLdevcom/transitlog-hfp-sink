@@ -7,29 +7,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.*;
+import java.text.DecimalFormat;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-import static java.sql.Types.*;
-
 public class QueueWriter {
     private static final Logger log = LoggerFactory.getLogger(QueueWriter.class);
 
     Connection connection;
+    int subsequentWriteFailCount;
 
     private QueueWriter(Connection conn) {
         connection = conn;
+        subsequentWriteFailCount = 0;
     }
+    private DecimalFormat df = new DecimalFormat("###.##");
 
-    public static QueueWriter newInstance(Config config) throws Exception {
-        final String connectionString = config.getString("db.connectionString");
-        final String user = config.getString("db.username");
-        final String password = config.getString("db.password");
-
-        log.info("Connecting to the database with connection string " + connectionString);
-        Connection conn = DriverManager.getConnection(connectionString, user, password);
+    public static QueueWriter newInstance(Config config, final String connectionString) throws Exception {
+        log.info("Connecting to the database");
+        Connection conn = DriverManager.getConnection(connectionString);
         conn.setAutoCommit(false); // we're doing batch inserts so no auto commit
         log.info("Connection success");
         return new QueueWriter(conn);
@@ -39,7 +37,7 @@ public class QueueWriter {
         return new StringBuffer()
                 .append("INSERT INTO VEHICLES (")
                 .append("received_at, topic_prefix, topic_version, ")
-                .append("journey_type, is_ongoing, mode, ")
+                .append("journey_type, is_ongoing, event_type, mode, ")
                 .append("owner_operator_id, vehicle_number, unique_vehicle_id, ")
                 .append("route_id, direction_id, headsign, ")
                 .append("journey_start_time, next_stop_id, geohash_level, ")
@@ -49,18 +47,19 @@ public class QueueWriter {
                 .append("spd, hdg, lat, ")
                 .append("long, acc, dl, ")
                 .append("odo, drst, oday, ")
-                .append("jrn, line, start")
+                .append("jrn, line, start, ")
+                .append("loc, stop, route, occu")
                 .append(") VALUES (")
-                .append("?, ?, ?, ?::JOURNEY_TYPE, ?, ?::TRANSPORT_MODE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ")
-                .append("?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?")
+                .append("?, ?, ?, ?::JOURNEY_TYPE, ?, ?::EVENT_TYPE, ?::TRANSPORT_MODE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ")
+                .append("?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::LOCATION_QUALITY_METHOD, ?, ?, ?")
                 .append(");")
                 .toString();
     }
 
-    public void write(List<Hfp.Data> messages) throws Exception {
-        log.info("Writing {} rows to database", messages.size());
+    public boolean write(List<Hfp.Data> messages, long startTime) throws Exception {
+        int toWriteCount = messages.size();
+        boolean writeSuccess = false;
 
-        long startTime = System.currentTimeMillis();
         String queryString = createInsertStatement();
         try (PreparedStatement statement = connection.prepareStatement(queryString)) {
 
@@ -78,6 +77,9 @@ public class QueueWriter {
                 // Protobuf doesn't allow us to get an object which hasn't been set, so we always have to check of existance before.
                 // JDBC Driver doesn't support Optionals nor does it stand leaving null values unset, so we need to explicitly insert nulls also.
                 // => these cause some boilerplate here.
+
+                Optional<String> maybeEventType = wrapToOptional(meta::hasEventType, meta::getEventType).map(eventType -> eventType.toString());
+                setNullable(index++, maybeEventType.orElse(null), Types.VARCHAR, statement);
 
                 Optional<String> maybeMode = wrapToOptional(meta::hasTransportMode, meta::getTransportMode).map(mode -> mode.toString());
                 setNullable(index++, maybeMode.orElse(null), Types.VARCHAR, statement);
@@ -110,16 +112,12 @@ public class QueueWriter {
                 statement.setLong(index++, message.getTsi());
 
                 setNullable(index++, message::hasSpd, message::getSpd, Types.DOUBLE, statement);
-                setNullable(index++, message::hasHdg, message::getHdg, Types.DOUBLE, statement);
+                setNullable(index++, message::hasHdg, message::getHdg, Types.INTEGER, statement);
                 setNullable(index++, message::hasLat, message::getLat, Types.DOUBLE, statement);
                 setNullable(index++, message::hasLong, message::getLong, Types.DOUBLE, statement);
                 setNullable(index++, message::hasAcc, message::getAcc, Types.DOUBLE, statement);
                 setNullable(index++, message::hasDl, message::getDl, Types.INTEGER, statement);
-
-
-                Optional<Double> maybeOdometer = wrapToOptional(message::hasOdo, message::getOdo).map(Integer::doubleValue);
-                setNullable(index++, maybeOdometer.orElse(null), Types.DOUBLE, statement);
-                //setNullable(index++, message::hasOdo, message::getOdo, Types.DOUBLE, statement); //TODO convert Odometer to Int in SQL Schema also
+                setNullable(index++, message::hasOdo, message::getOdo, Types.DOUBLE, statement);
 
                 Optional<Boolean> maybeDoors = wrapToOptional(message::hasDrst, message::getDrst).flatMap(HfpParser::safeParseBoolean);
                 setNullable(index++, maybeDoors.orElse(null), Types.BOOLEAN, statement);
@@ -132,20 +130,39 @@ public class QueueWriter {
                 Optional<Time> maybeStartTimePayload = wrapToOptional(message::hasStart, message::getStart).flatMap(HfpParser::safeParseTime);
                 setNullable(index++, maybeStartTimePayload.orElse(null), Types.TIME, statement);
 
+                Optional<String> maybeLoc = wrapToOptional(message::hasLoc, message::getLoc).map(loc -> loc.toString());
+                setNullable(index++, maybeLoc.orElse(null), Types.VARCHAR, statement);
+                setNullable(index++, message::hasStop, message::getStop, Types.INTEGER, statement);
+                setNullable(index++, message::hasRoute, message::getRoute, Types.VARCHAR, statement);
+                setNullable(index++, message::hasOccu, message::getOccu, Types.INTEGER, statement);
+
                 statement.addBatch();
             }
 
             statement.executeBatch();
             connection.commit();
+            writeSuccess = true;
         }
         catch (Exception e) {
+            writeSuccess = false;
             log.error("Failed to insert batch to database: ", e);
             connection.rollback();
             throw e;
         }
         finally {
-            long elapsed = System.currentTimeMillis() - startTime;
-            log.info("Total insert time: {} ms", elapsed);
+            double elapsed = (System.currentTimeMillis() - startTime) / 1000.0;
+            double writeSpeed = elapsed > 0 ? toWriteCount / elapsed : 999999.9;
+            if (writeSuccess == true) {
+                subsequentWriteFailCount = 0;
+                log.info("Total insert time: {} s, rate: {} rows/s, start time: {}", df.format(elapsed), df.format(writeSpeed), startTime);
+            } else {
+                subsequentWriteFailCount++;
+                log.error("Failed to insert in: {} s, rate: {} rows/s, start time: {}, subsequent fails (count): {}", df.format(elapsed), df.format(writeSpeed), startTime, subsequentWriteFailCount);
+                if (subsequentWriteFailCount > 9) {
+                    throw new Exception ("Failed to insert 10 times subsequently.");
+                }
+            }
+            return writeSuccess;
         }
     }
 
