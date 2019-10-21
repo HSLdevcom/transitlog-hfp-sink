@@ -113,6 +113,48 @@ public class MessageProcessor implements IMessageHandler {
         if (TransitdataSchema.hasProtobufSchema(message, TransitdataProperties.ProtobufSchema.HfpData)) {
             Hfp.Data data = Hfp.Data.parseFrom(message.getData());
 
+            switch (data.getTopic().getEventType()) {
+                case VP:
+                    switch (data.getTopic().getJourneyType()) {
+                        case journey:
+                            // TODO handle event type: VP & journey type: journey
+                            break;
+                        case deadrun:
+                            // TODO handle event type: VP & journey type: deadrun
+                            break;
+                        default:
+                            log.warn("Received unknown journey type {}", data.getTopic().getJourneyType());
+                    }
+                    break;
+                case DUE:
+                case ARR:
+                case ARS:
+                case PDE:
+                case DEP:
+                case PAS:
+                case WAIT:
+                    // TODO handle stop events
+                    break;
+                case TLR:
+                    // TODO handle event type: TLR
+                    break;
+                case TLA:
+                    // TODO handle event type: TLA
+                    break;
+                case DOO:
+                case DOC:
+                case DA:
+                case DOUT:
+                case BA:
+                case BOUT:
+                case VJA:
+                case VJOUT:
+                    // TODO handle other event types
+                    break;
+                default:
+                    log.warn("Received HFP message with unknown schema");
+            }
+
             synchronized (queue) {
                 queue.add(data);
                 msgQueue.add(message.getMessageId());
