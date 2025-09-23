@@ -45,7 +45,8 @@ public class MessageProcessor implements IMessageHandler {
     }
 
     public static MessageProcessor newInstance(PulsarApplication app, QueueWriter writer) throws Exception {
-        final long intervalInMs = app.getContext().getConfig().getDuration("application.dumpInterval", TimeUnit.MILLISECONDS);
+        final long intervalInMs = app.getContext().getConfig().getDuration("application.dumpInterval",
+                TimeUnit.MILLISECONDS);
 
         MessageProcessor processor = new MessageProcessor(app, writer);
         log.info("Let's start the dump-executor");
@@ -54,7 +55,7 @@ public class MessageProcessor implements IMessageHandler {
     }
 
     void startDumpExecutor(long intervalInMs) {
-        log.info("Dump interval {} seconds", intervalInMs/1000);
+        log.info("Dump interval {} seconds", intervalInMs / 1000);
         scheduler = Executors.newSingleThreadScheduledExecutor();
         log.info("Starting result-scheduler");
 
@@ -84,7 +85,8 @@ public class MessageProcessor implements IMessageHandler {
             double queueTtlTime = writeStartTime - queueClearTime;
             queueClearTime = System.currentTimeMillis();
             double msgRateIn = (queueTtlTime > 0) ? toWriteCount / (queueTtlTime / 1000.0) : 999999.9;
-            log.info("Writing {} rows to database, msgRateIn was: {} msg/s, start time: {}", toWriteCount, df.format(msgRateIn), writeStartTime);
+            log.info("Writing {} rows to database, msgRateIn was: {} msg/s, start time: {}", toWriteCount,
+                    df.format(msgRateIn), writeStartTime);
             boolean writeSuccess = writer.write(copy, writeStartTime);
             if (writeSuccess == true) {
                 ackDeliveredMessages(msgQueueCopy);
@@ -101,12 +103,15 @@ public class MessageProcessor implements IMessageHandler {
         if (queue.size() >= QUEUE_MAX_SIZE) {
             //TODO think what to do if queue is full (other than manually reset Pulsar cursor to read from message backlog)!
             if (Boolean.FALSE.equals(queueFull)) {
-                log.error("Queue got full. Storing messages to Pulsar backlog from now on, manually re-subscribe these later with Pulsar-admin");
+                log.error(
+                        "Queue got full. Storing messages to Pulsar backlog from now on, manually re-subscribe these later with Pulsar-admin");
                 queueFull = true;
             }
             return;
         } else {
-            if (Boolean.TRUE.equals(queueFull)) { log.info("Queue not full anymore, size: " + queue.size()); }
+            if (Boolean.TRUE.equals(queueFull)) {
+                log.info("Queue not full anymore, size: " + queue.size());
+            }
             queueFull = false;
         }
 
@@ -124,18 +129,17 @@ public class MessageProcessor implements IMessageHandler {
     }
 
     private void ackDeliveredMessages(List<MessageId> messageIds) {
-        for (MessageId msgId: messageIds) {
+        for (MessageId msgId : messageIds) {
             ack(msgId);
         }
     }
 
     private void ack(MessageId received) {
-        consumer.acknowledgeAsync(received)
-                .exceptionally(throwable -> {
-                    log.error("Failed to ack Pulsar message", throwable);
-                    return null;
-                })
-                .thenRun(() -> {});
+        consumer.acknowledgeAsync(received).exceptionally(throwable -> {
+            log.error("Failed to ack Pulsar message", throwable);
+            return null;
+        }).thenRun(() -> {
+        });
     }
 
     public void close(boolean closePulsar) {

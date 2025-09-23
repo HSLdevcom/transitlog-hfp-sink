@@ -21,14 +21,14 @@ public class Main {
         MessageProcessor processor = null;
         QueueWriter writer = null;
         try (PulsarApplication app = PulsarApplication.newInstance(config)) {
-            final String connectionString = ConfigUtils.getConnectionStringFromFileOrThrow(Optional.of("/run/secrets/db_conn_string"));
+            final String connectionString = ConfigUtils
+                    .getConnectionStringFromFileOrThrow(Optional.of("/run/secrets/db_conn_string"));
             writer = QueueWriter.newInstance(config, connectionString);
             processor = MessageProcessor.newInstance(app, writer);
             log.info("Starting to process messages");
 
             app.launchWithHandler(processor);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             log.error("Exception at main", e);
             if (processor != null) {
                 processor.close(false);
