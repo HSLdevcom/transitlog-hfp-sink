@@ -1,3 +1,9 @@
+# ⚠️ ARCHIVED
+
+This repository is archived and read-only. For active development, go to [Transitlog](https://github.com/HSLdevcom/transitlog).
+
+# transitlog-hfp-sink
+
 [![Build Status](https://travis-ci.org/HSLdevcom/transitlog-hfp-sink.svg?branch=master)](https://travis-ci.org/HSLdevcom/transitlog-hfp-sink)
 
 ## Description
