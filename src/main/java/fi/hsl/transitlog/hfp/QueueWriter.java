@@ -34,26 +34,17 @@ public class QueueWriter {
     }
 
     private String createInsertStatement() {
-        return new StringBuffer()
-                .append("INSERT INTO VEHICLES (")
-                .append("received_at, topic_prefix, topic_version, ")
+        return new StringBuffer().append("INSERT INTO VEHICLES (").append("received_at, topic_prefix, topic_version, ")
                 .append("journey_type, is_ongoing, event_type, mode, ")
                 .append("owner_operator_id, vehicle_number, unique_vehicle_id, ")
                 .append("route_id, direction_id, headsign, ")
-                .append("journey_start_time, next_stop_id, geohash_level, ")
-                .append("topic_latitude, topic_longitude, ")
-                .append("desi, dir, oper, ")
-                .append("veh, tst, tsi, ")
-                .append("spd, hdg, lat, ")
-                .append("long, acc, dl, ")
-                .append("odo, drst, oday, ")
-                .append("jrn, line, start, ")
-                .append("loc, stop, route, occu")
-                .append(") VALUES (")
+                .append("journey_start_time, next_stop_id, geohash_level, ").append("topic_latitude, topic_longitude, ")
+                .append("desi, dir, oper, ").append("veh, tst, tsi, ").append("spd, hdg, lat, ")
+                .append("long, acc, dl, ").append("odo, drst, oday, ").append("jrn, line, start, ")
+                .append("loc, stop, route, occu").append(") VALUES (")
                 .append("?, ?, ?, ?::JOURNEY_TYPE, ?, ?::EVENT_TYPE, ?::TRANSPORT_MODE, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ")
                 .append("?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::LOCATION_QUALITY_METHOD, ?, ?, ?")
-                .append(");")
-                .toString();
+                .append(");").toString();
     }
 
     public boolean write(List<Hfp.Data> messages, long startTime) throws Exception {
@@ -63,7 +54,7 @@ public class QueueWriter {
         String queryString = createInsertStatement();
         try (PreparedStatement statement = connection.prepareStatement(queryString)) {
 
-            for (Hfp.Data data: messages) {
+            for (Hfp.Data data : messages) {
                 int index = 1;
 
                 final Hfp.Topic meta = data.getTopic();
@@ -78,10 +69,12 @@ public class QueueWriter {
                 // JDBC Driver doesn't support Optionals nor does it stand leaving null values unset, so we need to explicitly insert nulls also.
                 // => these cause some boilerplate here.
 
-                Optional<String> maybeEventType = wrapToOptional(meta::hasEventType, meta::getEventType).map(eventType -> eventType.toString());
+                Optional<String> maybeEventType = wrapToOptional(meta::hasEventType, meta::getEventType)
+                        .map(eventType -> eventType.toString());
                 setNullable(index++, maybeEventType.orElse(null), Types.VARCHAR, statement);
 
-                Optional<String> maybeMode = wrapToOptional(meta::hasTransportMode, meta::getTransportMode).map(mode -> mode.toString());
+                Optional<String> maybeMode = wrapToOptional(meta::hasTransportMode, meta::getTransportMode)
+                        .map(mode -> mode.toString());
                 setNullable(index++, maybeMode.orElse(null), Types.VARCHAR, statement);
 
                 statement.setInt(index++, meta.getOperatorId());
@@ -92,7 +85,8 @@ public class QueueWriter {
                 setNullable(index++, meta::hasDirectionId, meta::getDirectionId, Types.INTEGER, statement);
                 setNullable(index++, meta::hasHeadsign, meta::getHeadsign, Types.VARCHAR, statement);
 
-                Optional<Time> maybeStartTime = wrapToOptional(meta::hasStartTime, meta::getStartTime).flatMap(HfpParser::safeParseTime);
+                Optional<Time> maybeStartTime = wrapToOptional(meta::hasStartTime, meta::getStartTime)
+                        .flatMap(HfpParser::safeParseTime);
                 setNullable(index++, maybeStartTime.orElse(null), Types.TIME, statement);
                 setNullable(index++, meta::hasNextStop, meta::getNextStop, Types.VARCHAR, statement);
                 setNullable(index++, meta::hasGeohashLevel, meta::getGeohashLevel, Types.INTEGER, statement);
@@ -103,7 +97,8 @@ public class QueueWriter {
                 final Hfp.Payload message = data.getPayload();
                 setNullable(index++, message::hasDesi, message::getDesi, Types.VARCHAR, statement);
 
-                Optional<Integer> maybeDirection = wrapToOptional(message::hasDir, message::getDir).flatMap(HfpParser::safeParseInt);
+                Optional<Integer> maybeDirection = wrapToOptional(message::hasDir, message::getDir)
+                        .flatMap(HfpParser::safeParseInt);
                 setNullable(index++, maybeDirection.orElse(null), Types.INTEGER, statement);
                 setNullable(index++, message::hasOper, message::getOper, Types.INTEGER, statement);
 
@@ -119,15 +114,18 @@ public class QueueWriter {
                 setNullable(index++, message::hasDl, message::getDl, Types.INTEGER, statement);
                 setNullable(index++, message::hasOdo, message::getOdo, Types.DOUBLE, statement);
 
-                Optional<Boolean> maybeDoors = wrapToOptional(message::hasDrst, message::getDrst).flatMap(HfpParser::safeParseBoolean);
+                Optional<Boolean> maybeDoors = wrapToOptional(message::hasDrst, message::getDrst)
+                        .flatMap(HfpParser::safeParseBoolean);
                 setNullable(index++, maybeDoors.orElse(null), Types.BOOLEAN, statement);
 
-                Optional<Date> maybeOperatingDay = wrapToOptional(message::hasOday, message::getOday).flatMap(HfpParser::safeParseDate);
+                Optional<Date> maybeOperatingDay = wrapToOptional(message::hasOday, message::getOday)
+                        .flatMap(HfpParser::safeParseDate);
                 setNullable(index++, maybeOperatingDay.orElse(null), Types.DATE, statement);
                 setNullable(index++, message::hasJrn, message::getJrn, Types.INTEGER, statement);
                 setNullable(index++, message::hasLine, message::getLine, Types.INTEGER, statement);
 
-                Optional<Time> maybeStartTimePayload = wrapToOptional(message::hasStart, message::getStart).flatMap(HfpParser::safeParseTime);
+                Optional<Time> maybeStartTimePayload = wrapToOptional(message::hasStart, message::getStart)
+                        .flatMap(HfpParser::safeParseTime);
                 setNullable(index++, maybeStartTimePayload.orElse(null), Types.TIME, statement);
 
                 Optional<String> maybeLoc = wrapToOptional(message::hasLoc, message::getLoc).map(loc -> loc.toString());
@@ -142,24 +140,24 @@ public class QueueWriter {
             statement.executeBatch();
             connection.commit();
             writeSuccess = true;
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             writeSuccess = false;
             log.error("Failed to insert batch to database: ", e);
             connection.rollback();
             throw e;
-        }
-        finally {
+        } finally {
             double elapsed = (System.currentTimeMillis() - startTime) / 1000.0;
             double writeSpeed = elapsed > 0 ? toWriteCount / elapsed : 999999.9;
             if (writeSuccess == true) {
                 subsequentWriteFailCount = 0;
-                log.info("Total insert time: {} s, rate: {} rows/s, start time: {}", df.format(elapsed), df.format(writeSpeed), startTime);
+                log.info("Total insert time: {} s, rate: {} rows/s, start time: {}", df.format(elapsed),
+                        df.format(writeSpeed), startTime);
             } else {
                 subsequentWriteFailCount++;
-                log.error("Failed to insert in: {} s, rate: {} rows/s, start time: {}, subsequent fails (count): {}", df.format(elapsed), df.format(writeSpeed), startTime, subsequentWriteFailCount);
+                log.error("Failed to insert in: {} s, rate: {} rows/s, start time: {}, subsequent fails (count): {}",
+                        df.format(elapsed), df.format(writeSpeed), startTime, subsequentWriteFailCount);
                 if (subsequentWriteFailCount > 9) {
-                    throw new Exception ("Failed to insert 10 times subsequently.");
+                    throw new Exception("Failed to insert 10 times subsequently.");
                 }
             }
             return writeSuccess;
@@ -173,7 +171,8 @@ public class QueueWriter {
         return Optional.empty();
     }
 
-    private <T> void setNullable(int index, Supplier<Boolean> isPresent, Supplier<T> getter, int jdbcType, PreparedStatement statement) throws SQLException {
+    private <T> void setNullable(int index, Supplier<Boolean> isPresent, Supplier<T> getter, int jdbcType,
+            PreparedStatement statement) throws SQLException {
         Optional<T> maybeValue = wrapToOptional(isPresent, getter);
         T valueOrNull = maybeValue.orElse(null);
         setNullable(index, valueOrNull, jdbcType, statement);
@@ -182,26 +181,33 @@ public class QueueWriter {
     private void setNullable(int index, Object value, int jdbcType, PreparedStatement statement) throws SQLException {
         if (value == null) {
             statement.setNull(index, jdbcType);
-        }
-        else {
+        } else {
             //This is just awful but Postgres driver does not support setObject(value, type);
             //Leaving null values not set is also not an option.
             switch (jdbcType) {
-                case Types.BOOLEAN: statement.setBoolean(index, (Boolean)value);
+                case Types.BOOLEAN :
+                    statement.setBoolean(index, (Boolean) value);
                     break;
-                case Types.INTEGER: statement.setInt(index, (Integer) value);
+                case Types.INTEGER :
+                    statement.setInt(index, (Integer) value);
                     break;
-                case Types.BIGINT: statement.setLong(index, (Long)value);
+                case Types.BIGINT :
+                    statement.setLong(index, (Long) value);
                     break;
-                case Types.DOUBLE: statement.setDouble(index, (Double) value);
+                case Types.DOUBLE :
+                    statement.setDouble(index, (Double) value);
                     break;
-                case Types.DATE: statement.setDate(index, (Date)value);
+                case Types.DATE :
+                    statement.setDate(index, (Date) value);
                     break;
-                case Types.TIME: statement.setTime(index, (Time)value);
+                case Types.TIME :
+                    statement.setTime(index, (Time) value);
                     break;
-                case Types.VARCHAR: statement.setString(index, (String)value); //Not sure if this is correct, field in schema is TEXT
+                case Types.VARCHAR :
+                    statement.setString(index, (String) value); //Not sure if this is correct, field in schema is TEXT
                     break;
-                default: log.error("Invalid jdbc type, bug in the app! {}", jdbcType);
+                default :
+                    log.error("Invalid jdbc type, bug in the app! {}", jdbcType);
                     break;
             }
         }
